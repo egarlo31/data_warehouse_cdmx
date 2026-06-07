@@ -1,0 +1,20 @@
+services:
+  postgres:
+    build: ./data_warehouse_cdmx
+    container_name: dw_postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: emilio
+      POSTGRES_PASSWORD: emilio123
+      POSTGRES_DB: dw_cdmx
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

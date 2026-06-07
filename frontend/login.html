@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Consumo de Agua CDMX</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 100%;
+            max-width: 450px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #00897b 0%, #004d40 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .login-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .login-body {
+            padding: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #00897b;
+            box-shadow: 0 0 0 3px rgba(0,137,123,0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #00897b 0%, #004d40 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.error {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+
+        .status.success {
+            background: #efe;
+            color: #3c3;
+            border: 1px solid #cfc;
+        }
+
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdef5;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .register-link a {
+            color: #00897b;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>💧 Consumo de Agua CDMX</h1>
+            <p>Inicia sesión para acceder al dashboard</p>
+        </div>
+        <div class="login-body">
+            <div class="form-group">
+                <label>📧 Correo</label>
+                <input type="email" id="username" placeholder="Ingresa tu correo" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>🔒 Contraseña</label>
+                <input type="password" id="password" placeholder="Ingresa tu contraseña">
+            </div>
+            <button class="btn-login" onclick="iniciarSesion()">Iniciar Sesión</button>
+            <div id="status" class="status"></div>
+            <div class="register-link">
+                ¿No tienes cuenta? <a href="Registro.html">Regístrate aquí</a>
+            </div>
+        </div>
+    </div>
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        async function iniciarSesion() {
+            const email = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            if (!email || !password) {
+                mostrarStatus("❌ Por favor, completa todos los campos", "error");
+                return;
+            }
+
+            mostrarStatus("🔐 Iniciando sesión...", "loading");
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem("token", "login-ok");
+                    localStorage.setItem("username", data.user.email);
+                    localStorage.setItem("email", data.user.email);
+
+                    mostrarStatus("✅ Login exitoso. Redirigiendo...", "success");
+
+                    setTimeout(() => {
+                        window.location.href = "index.html";
+                    }, 1000);
+                } else {
+                    mostrarStatus("❌ " + (data.detail || "Correo o contraseña incorrectos"), "error");
+                }
+
+            } catch (error) {
+                console.error("Error:", error);
+                mostrarStatus("⚠️ Error de conexión con el servidor", "error");
+            }
+        }
+
+        function mostrarStatus(mensaje, tipo) {
+            const statusDiv = document.getElementById("status");
+            statusDiv.textContent = mensaje;
+            statusDiv.className = `status show ${tipo}`;
+
+            if (tipo !== "loading") {
+                setTimeout(() => {
+                    statusDiv.className = "status";
+                }, 3000);
+            }
+        }
+
+        document.getElementById("password").addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                iniciarSesion();
+            }
+        });
+    </script>
+</body>
+</html>
