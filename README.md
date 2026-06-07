@@ -89,7 +89,8 @@ GET /api/consumo/resumen
 ---
 
 ## Authors
+* Emilio García López
+* Clara Aide Hernandez Martinez
 * Omar Fernando Pulido Morales
-* Eduardo Uriel Velazquez Arrieta
-* EL NO HIZO NADA Emilio García López
+* Eduardo Uriel Velzquez Arrieta
 
