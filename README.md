@@ -91,5 +91,5 @@ GET /api/consumo/resumen
 ## Authors
 * Omar Fernando Pulido Morales
 * Eduardo Uriel Velazquez Arrieta
-* EL NO HIZO NADA Emilio García López
+* don comedias
 
