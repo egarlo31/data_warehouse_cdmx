@@ -2,11 +2,28 @@
 -- ETL: Poblar dimensiones
 -- ============================================
 
--- Poblar dim_ubicacion
-INSERT INTO dim_ubicacion (alcaldia, colonia)
-SELECT DISTINCT alcaldia, colonia
+-- Poblar dim_ubicacion con coordenadas
+INSERT INTO dim_ubicacion (alcaldia, colonia, latitud, longitud)
+SELECT DISTINCT ON (alcaldia, colonia) alcaldia, colonia, latitud, longitud
 FROM staging_consumo
-WHERE colonia IS NOT NULL;
+WHERE colonia IS NOT NULL
+  AND latitud IS NOT NULL
+  AND longitud IS NOT NULL
+ORDER BY alcaldia, colonia, latitud, longitud;
+
+-- Backfill: si alguna colonia quedó sin coord, intenta con cualquier fila válida
+UPDATE dim_ubicacion d
+SET latitud = s.latitud, longitud = s.longitud
+FROM (
+    SELECT DISTINCT ON (alcaldia, colonia) alcaldia, colonia, latitud, longitud
+    FROM staging_consumo
+    WHERE colonia IS NOT NULL
+      AND latitud IS NOT NULL
+      AND longitud IS NOT NULL
+) s
+WHERE d.alcaldia = s.alcaldia
+  AND d.colonia = s.colonia
+  AND (d.latitud IS NULL OR d.longitud IS NULL);
 
 -- Poblar dim_indice_des
 INSERT INTO dim_indice_des (indice_des)

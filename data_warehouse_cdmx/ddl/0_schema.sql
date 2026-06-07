@@ -48,11 +48,13 @@ CREATE TABLE dim_tiempo (
     bimestre INT
 );
 
--- Dimensión de Ubicación (sin lat/long)
+-- Dimensión de Ubicación
 CREATE TABLE dim_ubicacion (
     id_ubicacion SERIAL PRIMARY KEY,
     alcaldia VARCHAR(255),
-    colonia VARCHAR(255)
+    colonia VARCHAR(255),
+    latitud NUMERIC,
+    longitud NUMERIC
 );
 
 -- Dimensión de Índice de Desarrollo

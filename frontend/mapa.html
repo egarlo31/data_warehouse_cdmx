@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Mapa de Consumo - CDMX</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .app-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #00897b 0%, #004d40 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .header h1 { font-size: 24px; display: flex; align-items: center; gap: 10px; }
+
+        .nav { display: flex; gap: 8px; align-items: center; }
+
+        .nav a, .btn-logout {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .nav a:hover, .btn-logout:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+
+        .user-info { display: flex; align-items: center; gap: 15px; }
+
+        .filters {
+            background: white;
+            border-radius: 20px;
+            padding: 20px 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .filter-group { flex: 1; min-width: 150px; }
+
+        .filter-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-group select:focus { outline: none; border-color: #00897b; }
+
+        .actions { display: flex; gap: 10px; }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary { background: #00897b; color: white; }
+        .btn-primary:hover { background: #00695c; transform: translateY(-1px); }
+        .btn-secondary { background: #e0e0e0; color: #333; }
+        .btn-secondary:hover { background: #ccc; }
+
+        .status {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .status.show { display: block; }
+        .status.error { background: #fee; border-left-color: #c33; }
+        .status.loading { background: #fff3e0; border-left-color: #ff9800; }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 20px;
+        }
+
+        .map-wrap {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            min-height: 600px;
+        }
+
+        #map { width: 100%; height: 70vh; min-height: 600px; }
+
+        .legend {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            height: fit-content;
+        }
+
+        .legend h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .legend-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            margin: 6px 0;
+        }
+
+        .legend-swatch {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.15);
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 14px 0;
+        }
+
+        .kpi-mini {
+            background: #f7f7f7;
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .kpi-mini .label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-mini .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #00897b;
+            margin-top: 4px;
+        }
+
+        .top-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .top-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .top-list li:nth-child(odd) { background: #f7f7f7; }
+
+        .top-list .name { color: #333; }
+        .top-list .val { color: #00897b; font-weight: 600; }
+
+        .selection-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border-radius: 12px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-left: 4px solid #00897b;
+        }
+
+        .selection-bar.show { display: flex; }
+
+        .selection-bar .label {
+            font-size: 13px;
+            color: #666;
+            margin-right: 8px;
+        }
+
+        .selection-bar .name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #00695c;
+        }
+
+        .selection-bar button {
+            background: #00897b;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .selection-bar button:hover { background: #00695c; }
+
+        .leaflet-popup-content {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+        }
+
+        .popup-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #00695c;
+            margin-bottom: 6px;
+        }
+
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 2px 0;
+        }
+
+        .popup-row .k { color: #666; }
+        .popup-row .v { color: #333; font-weight: 600; }
+
+        .leaflet-interactive { cursor: pointer; }
+        .leaflet-interactive:hover { filter: brightness(1.05); }
+
+        .detail-panel {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 12px 0;
+            border-left: 4px solid #ff6f00;
+            background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
+            box-shadow: 0 2px 6px rgba(255, 152, 0, 0.15);
+        }
+        .detail-panel .detail-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #e65100;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .detail-panel .detail-name {
+            font-size: 17px;
+            font-weight: 700;
+            color: #bf360c;
+            margin-bottom: 10px;
+        }
+        .detail-panel .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .detail-panel .detail-cell {
+            background: rgba(255,255,255,0.7);
+            border-radius: 10px;
+            padding: 8px;
+            text-align: center;
+        }
+        .detail-panel .detail-cell .k {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .detail-panel .detail-cell .v {
+            font-size: 15px;
+            font-weight: 700;
+            color: #bf360c;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 1024px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .app-container { padding: 10px; }
+            .filters { flex-direction: column; }
+            .filter-group { width: 100%; }
+            .header { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🗺️ Mapa de Consumo - CDMX</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <nav class="nav">
+                    <a href="index.html">📊 Dashboard</a>
+                    <button class="btn-logout" onclick="cerrarSesion()">🚪 Salir</button>
+                </nav>
+            </div>
+        </div>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label for="fAnio">Año</label>
+                <select id="fAnio"><option value="">Todos</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="fBimestre">Bimestre</label>
+                <select id="fBimestre"><option value="">Todos</option></select>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="cargarMapa()">🔍 Consultar</button>
+                <button class="btn btn-secondary" onclick="limpiarFiltros()">↺ Limpiar</button>
+            </div>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div id="selectionBar" class="selection-bar">
+            <div>
+                <span class="label">Alcaldía seleccionada:</span>
+                <span class="name" id="selectionName">—</span>
+            </div>
+            <button onclick="limpiarSeleccion()">✕ Limpiar selección</button>
+        </div>
+
+        <div class="layout">
+            <div class="map-wrap">
+                <div id="map"></div>
+            </div>
+            <aside class="legend">
+                <div id="detailPanel" class="detail-panel" style="display:none;">
+                    <div class="detail-title">💧 Datos de agua</div>
+                    <div class="detail-name" id="detailName">—</div>
+                    <div class="detail-grid">
+                        <div class="detail-cell"><div class="k">Consumo total</div><div class="v" id="detailTotal">—</div></div>
+                        <div class="detail-cell"><div class="k">Consumo prom.</div><div class="v" id="detailProm">—</div></div>
+                        <div class="detail-cell"><div class="k">🏠 Doméstico</div><div class="v" id="detailDom">—</div></div>
+                        <div class="detail-cell"><div class="k">🏢 No doméstico</div><div class="v" id="detailNoDom">—</div></div>
+                        <div class="detail-cell"><div class="k">🏬 Mixto</div><div class="v" id="detailMixto">—</div></div>
+                        <div class="detail-cell"><div class="k">Prom. dom.</div><div class="v" id="detailPromDom">—</div></div>
+                        <div class="detail-cell"><div class="k">Colonias</div><div class="v" id="detailColonias">—</div></div>
+                        <div class="detail-cell"><div class="k">Registros</div><div class="v" id="detailRegistros">—</div></div>
+                    </div>
+                </div>
+
+            </aside>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        const GEOJSON_URL = "/frontend/alcaldias.geojson";
+        const fmt = n => n == null ? '—' : Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+        const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('es-MX');
+
+        const CDMX_CENTER = [19.4326, -99.1332];
+        const CDMX_ZOOM = 11;
+
+        let map;
+        let geoJsonLayer = null;
+        let alcaldiasGeoJson = null;
+        let alcaldiaSeleccionada = null;
+        let layersByAlcaldia = new Map();
+        let ultimoResultado = [];
+
+        function initMap() {
+            map = L.map('map').setView(CDMX_CENTER, CDMX_ZOOM);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+            map.on('click', (e) => {
+                if (e.originalEvent.target.closest('.leaflet-interactive')) return;
+                if (alcaldiaSeleccionada) limpiarSeleccion();
+            });
+        }
+
+        function setStatus(msg, tipo) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = 'status show ' + tipo;
+        }
+
+        function hideStatus() {
+            document.getElementById('status').className = 'status';
+        }
+
+        function verificarAutenticacion() {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                window.location.href = "login.html";
+                return false;
+            }
+            return true;
+        }
+
+        function mostrarUsuario() {
+            const username = localStorage.getItem("username");
+            if (username) {
+                document.getElementById("userName").textContent = `👋 ${username}`;
+            }
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            localStorage.removeItem("email");
+            window.location.href = "login.html";
+        }
+
+        async function api(path) {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                window.location.href = "login.html";
+                throw new Error("No autenticado");
+            }
+            const response = await fetch(`${API_URL}${path}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (response.status === 401) {
+                localStorage.removeItem("token");
+                localStorage.removeItem("username");
+                window.location.href = "login.html";
+                throw new Error("Sesión expirada");
+            }
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+        }
+
+        function buildQuery() {
+            const p = new URLSearchParams();
+            const vAnio = document.getElementById('fAnio').value;
+            const vBim = document.getElementById('fBimestre').value;
+            if (vAnio) p.append('anio', vAnio);
+            if (vBim) p.append('bimestre', vBim);
+            return p.toString();
+        }
+
+        async function consultarAguaAlcaldia(nombre) {
+            const p = new URLSearchParams();
+            p.append('alcaldia', nombre);
+            const vAnio = document.getElementById('fAnio').value;
+            const vBim = document.getElementById('fBimestre').value;
+            if (vAnio) p.append('anio', vAnio);
+            if (vBim) p.append('bimestre', vBim);
+            return await api('/api/consumo/alcaldia?' + p.toString());
+        }
+
+        function actualizarDetalleConDatosBD(d) {
+            if (!d) return;
+            const panel = document.getElementById('detailPanel');
+            panel.style.display = 'block';
+            const setTxt = (id, v, unit) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = v == null ? '—' : (unit ? fmt(v) + ' ' + unit : fmt(v));
+            };
+            document.getElementById('detailName').textContent = d.alcaldia;
+            setTxt('detailTotal', d.consumo_total, 'm³');
+            setTxt('detailProm', d.consumo_prom, 'm³');
+            setTxt('detailDom', d.consumo_total_dom, 'm³');
+            setTxt('detailNoDom', d.consumo_total_no_dom, 'm³');
+            setTxt('detailMixto', d.consumo_total_mixto, 'm³');
+            setTxt('detailPromDom', d.consumo_prom_dom, 'm³');
+            document.getElementById('detailColonias').textContent = d.num_colonias != null ? fmtInt(d.num_colonias) : '—';
+            document.getElementById('detailRegistros').textContent = d.num_registros != null ? fmtInt(d.num_registros) : '—';
+        }
+
+        function norm(s) {
+            return (s == null ? '' : String(s)).trim().toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function getNombreAlcaldia(props) {
+            if (!props) return '';
+            return props.NOMGEO || props.nomgeo ||
+                   props.nom_mun || props.NOM_MUN || props.alcaldia ||
+                   props.ALCALDIA || props.municipio || props.MUNICIPIO ||
+                   props.name || props.NAME || props.nombre || '';
+        }
+
+        function getColorChoropleth(t) {
+            if (t == null || isNaN(t)) return '#cfd8dc';
+            if (t < 0.2) return '#e0f2f1';
+            if (t < 0.4) return '#80cbc4';
+            if (t < 0.6) return '#26a69a';
+            if (t < 0.8) return '#00897b';
+            return '#004d40';
+        }
+
+        function estiloPoligonoNormal(consumo, min, max) {
+            const range = max - min || 1;
+            const t = consumo != null ? (consumo - min) / range : null;
+            return {
+                color: '#00695c',
+                weight: 1.5,
+                fillColor: getColorChoropleth(t),
+                fillOpacity: consumo == null ? 0.25 : 0.7,
+            };
+        }
+
+        function estiloPoligonoSel() {
+            return {
+                color: '#ff6f00',
+                weight: 3.5,
+                fillColor: '#ffa726',
+                fillOpacity: 0.85,
+            };
+        }
+
+        function estiloPoligonoHover(consumo, min, max) {
+            const range = max - min || 1;
+            const t = consumo != null ? (consumo - min) / range : null;
+            return {
+                color: '#ff6f00',
+                weight: 2.5,
+                fillColor: getColorChoropleth(t),
+                fillOpacity: 0.85,
+            };
+        }
+
+        function renderAlcaldiasPoligonos(data) {
+            if (geoJsonLayer) {
+                map.removeLayer(geoJsonLayer);
+                geoJsonLayer = null;
+            }
+            layersByAlcaldia.clear();
+            if (!alcaldiasGeoJson) {
+                setStatus('No se cargó el GeoJSON de alcaldías (alcaldias.geojson).', 'error');
+                return;
+            }
+
+            const dataByAlcaldia = new Map();
+            data.forEach(d => { if (d.alcaldia) dataByAlcaldia.set(d.alcaldia, d); });
+            const dataByNorm = new Map();
+            data.forEach(d => { if (d.alcaldia) dataByNorm.set(norm(d.alcaldia), d); });
+
+            const consumos = data.map(d => d.consumo_total || 0);
+            const min = consumos.length ? Math.min(...consumos) : 0;
+            const max = consumos.length ? Math.max(...consumos) : 1;
+
+            geoJsonLayer = L.geoJSON(alcaldiasGeoJson, {
+                style: (feature) => {
+                    const nombre = getNombreAlcaldia(feature.properties);
+                    const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
+                    const consumo = d ? (d.consumo_total || 0) : null;
+                    if (alcaldiaSeleccionada && nombre === alcaldiaSeleccionada) {
+                        return estiloPoligonoSel();
+                    }
+                    return estiloPoligonoNormal(consumo, min, max);
+                },
+                onEachFeature: (feature, layer) => {
+                    const nombre = getNombreAlcaldia(feature.properties);
+                    const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
+
+                    layer.bindPopup(buildPopupHtml(nombre, d, true));
+
+                    layer.on('click', async (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        seleccionarAlcaldia(nombre);
+                        const popupCargando = `<div class="popup-title">💧 ${nombre}</div>
+                            <div class="popup-row"><span class="k" style="color:#888;">⏳ Consultando consumo en la BD...</span></div>`;
+                        layer.bindPopup(popupCargando).openPopup(e.latlng);
+                        try {
+                            const datos = await consultarAguaAlcaldia(nombre);
+                            const popup = layer.getPopup();
+                            if (popup) popup.setContent(buildPopupHtml(nombre, datos, true));
+                            actualizarDetalleConDatosBD(datos);
+                        } catch (err) {
+                            const popup = layer.getPopup();
+                            if (popup) popup.setContent(`<div class="popup-title">💧 ${nombre}</div>
+                                <div class="popup-row"><span class="k" style="color:#c33;">❌ Error: ${err.message}</span></div>`);
+                        }
+                    });
+
+                    layer.on('mouseover', (e) => {
+                        const t = e.target;
+                        if (alcaldiaSeleccionada !== nombre) {
+                            const dLocal = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
+                            t.setStyle(estiloPoligonoHover(dLocal ? (dLocal.consumo_total || 0) : null, min, max));
+                        }
+                        t.bringToFront();
+                    });
+                    layer.on('mouseout', (e) => {
+                        const t = e.target;
+                        if (alcaldiaSeleccionada !== nombre && geoJsonLayer) {
+                            geoJsonLayer.resetStyle(t);
+                        }
+                    });
+
+                    if (nombre) layersByAlcaldia.set(nombre, layer);
+                }
+            }).addTo(map);
+
+            try {
+                const b = geoJsonLayer.getBounds();
+                if (b.isValid()) map.fitBounds(b, { padding: [40, 40] });
+            } catch (e) {}
+        }
+
+        function buildPopupHtml(nombre, d, esPoligono) {
+            if (!d || d.sin_datos) {
+                return `<div class="popup-title">💧 ${nombre}</div>
+                    <div class="popup-row"><span class="k" style="color:#999;">Sin datos de agua para los filtros</span></div>
+                    ${esPoligono ? `<div class="popup-hint" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:11px;color:#888;">💧 La BD no tiene registros</div>` : ''}`;
+            }
+            const row = (k, v, unidad = 'm³') =>
+                v != null ? `<div class="popup-row"><span class="k">${k}</span><span class="v">${fmt(v)} ${unidad}</span></div>` : '';
+            const rowInt = (k, v) =>
+                v != null ? `<div class="popup-row"><span class="k">${k}</span><span class="v">${fmtInt(v)}</span></div>` : '';
+
+            const desglose = (d.consumo_total_dom != null || d.consumo_total_mixto != null || d.consumo_total_no_dom != null)
+                ? `<div style="margin-top:8px;padding-top:6px;border-top:1px dashed #ddd;">
+                       <div class="popup-section" style="font-size:11px;font-weight:700;color:#00695c;margin-bottom:4px;letter-spacing:0.3px;">DESGLOSE POR TIPO</div>
+                       ${row('🏠 Doméstico', d.consumo_total_dom)}
+                       ${row('🏢 No doméstico', d.consumo_total_no_dom)}
+                       ${row('🏬 Mixto', d.consumo_total_mixto)}
+                   </div>` : '';
+
+            const rangoAnios = (d.anio_min != null && d.anio_max != null)
+                ? `<div style="margin-top:6px;font-size:11px;color:#888;text-align:right;">Período: ${d.anio_min}${d.anio_min !== d.anio_max ? '–' + d.anio_max : ''}</div>`
+                : '';
+
+            return `<div class="popup-title">💧 ${nombre}</div>
+                <div class="popup-row"><span class="k">Consumo total</span><span class="v">${fmt(d.consumo_total)} m³</span></div>
+                <div class="popup-row"><span class="k">Consumo prom.</span><span class="v">${fmt(d.consumo_prom)} m³</span></div>
+                ${rowInt('Colonias', d.num_colonias)}
+                ${rowInt('Registros', d.num_registros)}
+                ${desglose}
+                ${rangoAnios}`;
+        }
+
+        function renderMapa(data) {
+            renderAlcaldiasPoligonos(data);
+            renderDetailPanel(data);
+        }
+
+        function renderDetailPanel(data) {
+            const panel = document.getElementById('detailPanel');
+            if (!alcaldiaSeleccionada) { panel.style.display = 'none'; return; }
+            const d = data.find(x => x.alcaldia === alcaldiaSeleccionada)
+                || data.find(x => norm(x.alcaldia) === norm(alcaldiaSeleccionada));
+            if (!d) { panel.style.display = 'none'; return; }
+            panel.style.display = 'block';
+            const setTxt = (id, v, unit) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = v == null ? '—' : (unit ? fmt(v) + ' ' + unit : fmt(v));
+            };
+            document.getElementById('detailName').textContent = d.alcaldia;
+            setTxt('detailTotal', d.consumo_total, 'm³');
+            setTxt('detailProm', d.consumo_prom, 'm³');
+            setTxt('detailDom', d.consumo_total_dom, 'm³');
+            setTxt('detailNoDom', d.consumo_total_no_dom, 'm³');
+            setTxt('detailMixto', d.consumo_total_mixto, 'm³');
+            setTxt('detailPromDom', d.consumo_prom_dom, 'm³');
+            document.getElementById('detailColonias').textContent = d.num_colonias != null ? fmtInt(d.num_colonias) : '—';
+            document.getElementById('detailRegistros').textContent = d.num_registros != null ? fmtInt(d.num_registros) : '—';
+        }
+
+        function aplicarEstiloSeleccion() {
+            if (!geoJsonLayer) return;
+            const data = ultimoResultado;
+            const dataByAlcaldia = new Map();
+            data.forEach(d => { if (d.alcaldia) dataByAlcaldia.set(d.alcaldia, d); });
+            const dataByNorm = new Map();
+            data.forEach(d => { if (d.alcaldia) dataByNorm.set(norm(d.alcaldia), d); });
+            const consumos = data.map(d => d.consumo_total || 0);
+            const min = consumos.length ? Math.min(...consumos) : 0;
+            const max = consumos.length ? Math.max(...consumos) : 1;
+            layersByAlcaldia.forEach((layer, nombre) => {
+                if (alcaldiaSeleccionada === nombre) {
+                    layer.setStyle(estiloPoligonoSel());
+                    layer.bringToFront();
+                } else {
+                    const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
+                    const consumo = d ? (d.consumo_total || 0) : null;
+                    layer.setStyle(estiloPoligonoNormal(consumo, min, max));
+                }
+            });
+        }
+
+        function seleccionarAlcaldia(nombre) {
+            alcaldiaSeleccionada = nombre;
+            document.getElementById('selectionName').textContent = nombre;
+            document.getElementById('selectionBar').classList.add('show');
+            aplicarEstiloSeleccion();
+            renderDetailPanel(ultimoResultado);
+        }
+
+        function limpiarSeleccion() {
+            alcaldiaSeleccionada = null;
+            document.getElementById('selectionBar').classList.remove('show');
+            map.closePopup();
+            aplicarEstiloSeleccion();
+            renderDetailPanel(ultimoResultado);
+        }
+
+
+
+        async function cargarMapa() {
+            setStatus('Cargando datos geográficos...', 'loading');
+            try {
+                const q = buildQuery();
+                ultimoResultado = await api(`/api/ubicaciones/alcaldias?${q}`);
+                renderMapa(ultimoResultado);
+           
+                hideStatus();
+            } catch (e) {
+                if (e.message !== "No autenticado" && e.message !== "Sesión expirada") {
+                    setStatus('Error: ' + e.message, 'error');
+                }
+            }
+        }
+
+        async function cargarGeojsonAlcaldias() {
+            try {
+                const r = await fetch(GEOJSON_URL);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                alcaldiasGeoJson = await r.json();
+            } catch (e) {
+                setStatus(`No se pudo cargar ${GEOJSON_URL} (${e.message}). Descárgalo y colócalo junto a este HTML.`, 'error');
+            }
+        }
+
+        async function cargarCatalogos() {
+            try {
+                const [anios, bimestres] = await Promise.all([
+                    api('/api/anios'),
+                    api('/api/bimestres'),
+                ]);
+                const selAnio = document.getElementById('fAnio');
+                anios.forEach(v => selAnio.add(new Option(v, v)));
+                const selBim = document.getElementById('fBimestre');
+                bimestres.forEach(v => selBim.add(new Option('Bim ' + v, v)));
+            } catch (e) {
+                setStatus('Error al cargar catálogos: ' + e.message, 'error');
+            }
+        }
+
+        function limpiarFiltros() {
+            ['fAnio', 'fBimestre'].forEach(id => document.getElementById(id).value = '');
+            cargarMapa();
+        }
+
+        async function inicializar() {
+            if (!verificarAutenticacion()) return;
+            mostrarUsuario();
+            initMap();
+            await cargarGeojsonAlcaldias();
+            await cargarCatalogos();
+            await cargarMapa();
+        }
+
+        inicializar();
+    </script>
+</body>
+</html>

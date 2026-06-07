@@ -332,6 +332,7 @@
             <h1>💧 Consumo de Agua en CDMX</h1>
             <div class="user-info">
                 <span id="userName"></span>
+                <a href="mapa.html" class="btn-logout" style="text-decoration:none;">🗺️ Mapa</a>
                 <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
             </div>
         </div>
@@ -403,7 +404,7 @@
                 <div id="chartTop" class="chart"></div>
             </div>
             <div class="panel">
-                <h3>🌡️ Correlación Consumo vs Clima (por bimestre)</h3>
+                <h3>🌡️ Correlación Consumo vs Temperatura promedio (por bimestre)</h3>
                 <div id="chartCorr" class="chart"></div>
             </div>
             <div class="panel" style="grid-column: 1 / -1;">
@@ -566,11 +567,13 @@
             setStatus('Consultando el data warehouse...', 'loading');
             try {
                 const q = buildQuery();
+                const vAnioCorr = document.getElementById('fAnio').value;
+                const qCorr = vAnioCorr ? '?anio=' + encodeURIComponent(vAnioCorr) : '';
                 const [consumo, resumen, top, correlacion] = await Promise.all([
                     api('/api/consumo?' + q),
                     api('/api/consumo/resumen?' + q.split('&').filter(x => !x.startsWith('limit') && !x.startsWith('offset')).join('&')),
                     api('/api/top-consumo?' + q.split('&').filter(x => !x.startsWith('limit') && !x.startsWith('offset')).join('&') + '&limit=10'),
-                    api('/api/correlacion'),
+                    api('/api/correlacion' + qCorr),
                 ]);
 
                 totalRegistros = consumo.total;
@@ -647,19 +650,20 @@
         }
 
         function graficarCorrelacion(rows) {
-            if (!rows.length) {
+            if (!rows || !rows.length) {
                 Plotly.purge('chartCorr');
                 return;
             }
             Plotly.newPlot('chartCorr', [
                 {
-                    x: rows.map(r => r.total_lluvia),
+                    x: rows.map(r => r.temp_promedio),
                     y: rows.map(r => r.total_agua),
                     text: rows.map(r => 'Bim ' + r.bimestre + ' / ' + r.anio),
+                    customdata: rows.map(r => [r.total_lluvia, r.dias_ola_calor, r.dias_frio]),
                     mode: 'markers+text',
                     textposition: 'top center',
                     marker: {
-                        size: rows.map(r => r.temp_promedio || 0),
+                        size: rows.map(r => Math.max((r.total_lluvia || 0) / 5, 8)),
                         sizemode: 'area',
                         sizeref: 0.3,
                         color: rows.map(r => r.temp_promedio),
@@ -667,10 +671,17 @@
                         showscale: true,
                         colorbar: { title: 'Temp °C' },
                     },
-                    hovertemplate: '<b>%{text}</b><br>Lluvia: %{x} mm<br>Consumo: %{y:,.0f} m³<extra></extra>',
+                    hovertemplate:
+                        '<b>%{text}</b>' +
+                        '<br>🌡️ Temp prom: %{x:.1f} °C' +
+                        '<br>💧 Consumo: %{y:,.0f} m³' +
+                        '<br>🌧️ Lluvia: %{customdata[0]:,.1f} mm' +
+                        '<br>🔥 Días ola de calor: %{customdata[1]}' +
+                        '<br>❄️ Días fríos: %{customdata[2]}' +
+                        '<extra></extra>',
                 },
             ], {
-                xaxis: { title: 'Lluvia total (mm)' },
+                xaxis: { title: 'Temperatura promedio (°C)' },
                 yaxis: { title: 'Consumo total (m³)' },
                 margin: { t: 20, b: 50, l: 60, r: 20 },
             }, { displayModeBar: false, responsive: true });
