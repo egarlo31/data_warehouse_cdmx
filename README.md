@@ -92,10 +92,6 @@ GET /api/consumo/resumen
 * Emilio García López
 * Clara Aide Hernandez Martinez
 * Omar Fernando Pulido Morales
-<<<<<<< HEAD
 * Eduardo Uriel Velzquez Arrieta
-=======
-* Eduardo Uriel Velazquez Arrieta
-* don comedias
->>>>>>> 54d26d0d42a5f8b28ebb9e41682f1b22cc389f82
+
 
