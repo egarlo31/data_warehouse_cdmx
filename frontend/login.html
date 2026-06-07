@@ -210,7 +210,11 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    localStorage.setItem("token", "login-ok");
+                    if (!data.access_token) {
+                        mostrarStatus("❌ Respuesta inválida del servidor", "error");
+                        return;
+                    }
+                    localStorage.setItem("token", data.access_token);
                     localStorage.setItem("username", data.user.email);
                     localStorage.setItem("email", data.user.email);
 

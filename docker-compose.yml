@@ -5,10 +5,13 @@ services:
 
     restart: always
 
+    env_file:
+      - .env
+
     environment:
-      POSTGRES_USER: emilio
-      POSTGRES_PASSWORD: emilio123
-      POSTGRES_DB: dw_cdmx
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
 
     ports:
       - "5435:5432"

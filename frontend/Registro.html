@@ -179,7 +179,7 @@
             <div class="form-group">
                 <label>🔒 Contraseña</label>
                 <input type="password" id="password" placeholder="Crea una contraseña">
-                <div class="password-requirements">Mínimo 4 caracteres</div>
+                <div class="password-requirements">Mínimo 8 caracteres, con mayúscula, minúscula y número</div>
             </div>
             <div class="form-group">
                 <label>✅ Confirmar Contraseña</label>
@@ -206,21 +206,20 @@
                 return;
             }
 
-            if (password.length < 4) {
-                mostrarStatus("❌ La contraseña debe tener al menos 4 caracteres", "error");
+            if (password.length < 8) {
+                mostrarStatus("❌ La contraseña debe tener al menos 8 caracteres", "error");
                 return;
             }
-
+            if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+                mostrarStatus("❌ La contraseña debe incluir mayúscula, minúscula y número", "error");
+                return;
+            }
             if (password !== confirmPassword) {
                 mostrarStatus("❌ Las contraseñas no coinciden", "error");
                 return;
             }
 
             mostrarStatus("📝 Creando cuenta...", "loading");
-
-            const formData = new URLSearchParams();
-            formData.append("username", email);
-            formData.append("password", password);
 
             try {
                 const response = await fetch("http://127.0.0.1:8000/api/register", {
@@ -238,10 +237,20 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    mostrarStatus("✅ ¡Registro exitoso! Redirigiendo al login...", "success");
-                    setTimeout(() => {
-                        window.location.href = "login.html";
-                    }, 1500);
+                    if (data.access_token) {
+                        localStorage.setItem("token", data.access_token);
+                        localStorage.setItem("username", data.user.email);
+                        localStorage.setItem("email", data.user.email);
+                        mostrarStatus("✅ ¡Registro exitoso! Redirigiendo...", "success");
+                        setTimeout(() => {
+                            window.location.href = "index.html";
+                        }, 1000);
+                    } else {
+                        mostrarStatus("✅ ¡Registro exitoso! Inicia sesión...", "success");
+                        setTimeout(() => {
+                            window.location.href = "login.html";
+                        }, 1500);
+                    }
                 } else {
                     mostrarStatus("❌ " + (data.detail || "Error al registrar usuario"), "error");
                 }
