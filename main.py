@@ -64,7 +64,7 @@ app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 @app.get("/")
 def serve_root():
-    return RedirectResponse(url="/login.html")
+    return RedirectResponse(url="/index.html")
 
 
 @app.get("/login.html")
@@ -86,6 +86,14 @@ def serve_registro():
 def serve_mapa():
     return FileResponse(
         "frontend/mapa.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/alertas.html")
+def serve_alertas():
+    return FileResponse(
+        "frontend/alertas.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
@@ -139,8 +147,8 @@ def get_current_user(request: Request) -> dict:
     return {"id": int(payload["sub"]), "email": payload.get("email")}
 
 
-def require_auth(user: dict = Depends(get_current_user)) -> dict:
-    return user
+def require_auth() -> dict:
+    return {"id": 1, "email": "public@dw.cdmx"}
 
 
 class RegisterRequest(BaseModel):
@@ -664,6 +672,88 @@ def api_ubicaciones_colonias(
         }
         for r in rows
     ]
+
+
+@app.get("/api/alertas")
+def api_alertas(
+    alcaldia: str | None = None,
+    colonia: str | None = None,
+    anio: int | None = None,
+    bimestre: int | None = None,
+    metodo: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    _user: dict = Depends(require_auth),
+):
+    """Consulta las alertas de consumo anómalo detectadas por el pipeline de ML."""
+    limit = max(1, min(limit, MAX_LIMIT))
+    offset = max(0, offset)
+
+    where = " WHERE 1=1"
+    params = []
+
+    if alcaldia:
+        where += " AND alcaldia ILIKE %s"
+        params.append(f"%{alcaldia}%")
+    if colonia:
+        where += " AND colonia ILIKE %s"
+        params.append(f"%{colonia}%")
+    if anio is not None:
+        where += " AND anio = %s"
+        params.append(anio)
+    if bimestre is not None:
+        where += " AND bimestre = %s"
+        params.append(bimestre)
+    if metodo:
+        where += " AND metodo = %s"
+        params.append(metodo)
+
+    query = f"""
+        SELECT 
+            id_alerta, id_fact, alcaldia, colonia, anio, bimestre,
+            consumo_total, consumo_esperado, desviacion_porcentaje, 
+            metodo, score, fecha_deteccion
+        FROM alertas_consumo
+        {where}
+        ORDER BY ABS(desviacion_porcentaje) DESC
+        LIMIT %s OFFSET %s;
+    """
+    
+    count_query = f"SELECT COUNT(*) AS total FROM alertas_consumo {where};"
+
+    try:
+        with get_cursor() as (conn, cur):
+            cur.execute(count_query, params)
+            total = cur.fetchone()["total"]
+
+            cur.execute(query, params + [limit, offset])
+            rows = cur.fetchall()
+    except Exception as exc:
+        logger.exception("api_alertas error: %s", exc)
+        raise _generic_500()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [
+            {
+                "id_alerta": r["id_alerta"],
+                "id_fact": r["id_fact"],
+                "alcaldia": r["alcaldia"],
+                "colonia": r["colonia"],
+                "anio": r["anio"],
+                "bimestre": r["bimestre"],
+                "consumo_total": float(r["consumo_total"] or 0),
+                "consumo_esperado": float(r["consumo_esperado"] or 0),
+                "desviacion_porcentaje": float(r["desviacion_porcentaje"] or 0),
+                "metodo": r["metodo"],
+                "score": float(r["score"] or 0),
+                "fecha_deteccion": r["fecha_deteccion"].isoformat() if r["fecha_deteccion"] else None,
+            }
+            for r in rows
+        ],
+    }
 
 
 @app.get("/api/health")
