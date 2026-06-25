@@ -32,8 +32,8 @@ data_warehouse_cdmx/
 │
 ├── frontend/
 │   ├── index.html
-│   ├── login.html
-│   └── Registro.html
+│   ├── mapa.html
+│   └── alertas.html
 │
 ├── data_warehouse_cdmx/
 │   └── SQL scripts and database configuration
@@ -49,10 +49,10 @@ data_warehouse_cdmx/
 
 * Dockerized PostgreSQL database
 * REST API endpoints
-* User login and registration system
 * Interactive frontend
 * Data filtering and visualization
 * Geographic consultation using coordinates
+* Anomaly detection alerts (IQR + Isolation Forest)
 
 ---
 

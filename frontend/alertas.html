@@ -67,7 +67,7 @@
             transform: translateY(-1px);
         }
 
-        .btn-logout {
+        .btn-nav {
             background: rgba(0,0,0,0.2);
             color: white;
             border: none;
@@ -78,7 +78,7 @@
             transition: all 0.3s ease;
         }
 
-        .btn-logout:hover {
+        .btn-nav:hover {
             background: rgba(0,0,0,0.3);
             transform: translateY(-1px);
         }
@@ -444,18 +444,6 @@
         let paginaActual = 0;
         let totalRegistros = 0;
 
-        function verificarAutenticacion() {
-            return true;
-        }
-
-        function mostrarUsuario() {
-            // No hacer nada
-        }
-
-        function cerrarSesion() {
-            // No hacer nada
-        }
-
         async function api(path) {
             const response = await fetch(`http://127.0.0.1:8000${path}`);
             if (!response.ok) {
@@ -596,8 +584,6 @@
         }
 
         async function inicializar() {
-            if (!verificarAutenticacion()) return;
-            mostrarUsuario();
             await cargarCatalogos();
             await cargarDatos();
         }

@@ -1,22 +1,16 @@
 import os
-import re
 import json
 import logging
 import urllib.request
-from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from passlib.context import CryptContext
 import psycopg2
-from psycopg2 import errors
 from psycopg2.extras import RealDictCursor
-import jwt
 
 load_dotenv()
 
@@ -26,14 +20,9 @@ DB_NAME = os.getenv("DB_NAME", "dw_cdmx")
 DB_USER = os.getenv("DB_USER", "emilio")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "60"))
-
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
 MAX_LIMIT = 500
-MIN_PASSWORD_LENGTH = 8
 
 ALCALDIAS_GEOJSON_URL = (
     "https://raw.githubusercontent.com/PhantomInsights/mexico-geojson/"
@@ -41,8 +30,6 @@ ALCALDIAS_GEOJSON_URL = (
 )
 _geojson_cache: dict | None = None
 
-if not JWT_SECRET or len(JWT_SECRET) < 32:
-    raise RuntimeError("JWT_SECRET must be defined in .env and be at least 32 characters long")
 if not DB_PASSWORD:
     raise RuntimeError("DB_PASSWORD must be defined in .env")
 
@@ -56,7 +43,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS or [],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type"],
 )
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
@@ -67,19 +54,9 @@ def serve_root():
     return RedirectResponse(url="/index.html")
 
 
-@app.get("/login.html")
-def serve_login():
-    return FileResponse("frontend/login.html")
-
-
 @app.get("/index.html")
 def serve_index():
     return FileResponse("frontend/index.html")
-
-
-@app.get("/Registro.html")
-def serve_registro():
-    return FileResponse("frontend/Registro.html")
 
 
 @app.get("/mapa.html")
@@ -96,9 +73,6 @@ def serve_alertas():
         "frontend/alertas.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
-
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 @contextmanager
@@ -122,118 +96,12 @@ def get_cursor():
             conn.close()
 
 
-def create_access_token(user_id: int, email: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRES_MINUTES)
-    payload = {
-        "sub": str(user_id),
-        "email": email,
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def get_current_user(request: Request) -> dict:
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
-    token = auth.split(" ", 1)[1].strip()
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expirado")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-    return {"id": int(payload["sub"]), "email": payload.get("email")}
-
-
-def require_auth() -> dict:
-    return {"id": 1, "email": "public@dw.cdmx"}
-
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
-    confirm_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
-
-    @field_validator("password")
-    @classmethod
-    def password_strength(cls, v: str) -> str:
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("La contraseña debe incluir al menos una mayúscula")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("La contraseña debe incluir al menos una minúscula")
-        if not re.search(r"\d", v):
-            raise ValueError("La contraseña debe incluir al menos un número")
-        return v
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=1, max_length=128)
-
-
 def _generic_500() -> HTTPException:
     return HTTPException(status_code=500, detail="Error interno del servidor")
 
 
-@app.post("/api/register", status_code=201)
-def register(data: RegisterRequest):
-    if data.password != data.confirm_password:
-        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
-
-    password_hash = pwd_context.hash(data.password)
-
-    try:
-        with get_cursor() as (conn, cur):
-            cur.execute(
-                "INSERT INTO usuarios (email, password_hash) VALUES (%s, %s) RETURNING id, email;",
-                (data.email, password_hash),
-            )
-            user = cur.fetchone()
-            conn.commit()
-    except errors.UniqueViolation:
-        raise HTTPException(status_code=400, detail="El correo ya está registrado")
-    except Exception as exc:
-        logger.exception("register failed: %s", exc)
-        raise _generic_500()
-
-    token = create_access_token(user["id"], user["email"])
-    return {
-        "message": "Usuario registrado correctamente",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"id": user["id"], "email": user["email"]},
-    }
-
-
-@app.post("/api/login")
-def login(data: LoginRequest):
-    try:
-        with get_cursor() as (conn, cur):
-            cur.execute(
-                "SELECT id, email, password_hash FROM usuarios WHERE email = %s;",
-                (data.email,),
-            )
-            user = cur.fetchone()
-    except Exception as exc:
-        logger.exception("login db error: %s", exc)
-        raise _generic_500()
-
-    if user is None or not pwd_context.verify(data.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
-
-    token = create_access_token(user["id"], user["email"])
-    return {
-        "message": "Login correcto",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"id": user["id"], "email": user["email"]},
-    }
-
-
 @app.get("/api/clima")
-def api_clima(limit: int = 500, _user: dict = Depends(require_auth)):
+def api_clima(limit: int = 500):
     return {"data": []}
 
 
@@ -246,7 +114,6 @@ def api_consumo(
     indice_des: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    _user: dict = Depends(require_auth),
 ):
     limit = max(1, min(limit, MAX_LIMIT))
     offset = max(0, offset)
@@ -322,7 +189,7 @@ def api_consumo(
 
 
 @app.get("/api/consumo/resumen")
-def api_resumen(_user: dict = Depends(require_auth)):
+def api_resumen():
     try:
         with get_cursor() as (conn, cur):
             cur.execute(
@@ -354,7 +221,7 @@ def api_resumen(_user: dict = Depends(require_auth)):
 
 
 @app.get("/api/top-consumo")
-def api_top_consumo(limit: int = 10, _user: dict = Depends(require_auth)):
+def api_top_consumo(limit: int = 10):
     limit = max(1, min(limit, MAX_LIMIT))
     try:
         with get_cursor() as (conn, cur):
@@ -385,10 +252,7 @@ def api_top_consumo(limit: int = 10, _user: dict = Depends(require_auth)):
 
 
 @app.get("/api/correlacion")
-def api_correlacion(
-    anio: int | None = None,
-    _user: dict = Depends(require_auth),
-):
+def api_correlacion(anio: int | None = None):
     """Correlación por bimestre entre consumo de agua y clima (temperatura, lluvia, días extremos)."""
     if anio is not None and not 1900 <= anio <= 2100:
         raise HTTPException(status_code=400, detail="anio fuera de rango")
@@ -459,7 +323,7 @@ def api_correlacion(
 
 
 @app.get("/api/anios")
-def api_anios(_user: dict = Depends(require_auth)):
+def api_anios():
     try:
         with get_cursor() as (conn, cur):
             cur.execute("SELECT DISTINCT anio FROM dim_tiempo WHERE anio IS NOT NULL ORDER BY anio;")
@@ -471,7 +335,7 @@ def api_anios(_user: dict = Depends(require_auth)):
 
 
 @app.get("/api/bimestres")
-def api_bimestres(_user: dict = Depends(require_auth)):
+def api_bimestres():
     try:
         with get_cursor() as (conn, cur):
             cur.execute("SELECT DISTINCT bimestre FROM dim_tiempo WHERE bimestre IS NOT NULL ORDER BY bimestre;")
@@ -483,7 +347,7 @@ def api_bimestres(_user: dict = Depends(require_auth)):
 
 
 @app.get("/api/alcaldias")
-def api_alcaldias(_user: dict = Depends(require_auth)):
+def api_alcaldias():
     try:
         with get_cursor() as (conn, cur):
             cur.execute("SELECT DISTINCT alcaldia FROM dim_ubicacion WHERE alcaldia IS NOT NULL ORDER BY alcaldia;")
@@ -495,7 +359,7 @@ def api_alcaldias(_user: dict = Depends(require_auth)):
 
 
 @app.get("/api/indices")
-def api_indices(_user: dict = Depends(require_auth)):
+def api_indices():
     try:
         with get_cursor() as (conn, cur):
             cur.execute(
@@ -509,7 +373,7 @@ def api_indices(_user: dict = Depends(require_auth)):
 
 
 @app.get("/api/colonias")
-def api_colonias(alcaldia: str | None = None, _user: dict = Depends(require_auth)):
+def api_colonias(alcaldia: str | None = None):
     try:
         with get_cursor() as (conn, cur):
             if alcaldia:
@@ -533,7 +397,6 @@ def api_ubicaciones_alcaldias(
     anio: int | None = None,
     bimestre: int | None = None,
     alcaldia: str | None = None,
-    _user: dict = Depends(require_auth),
 ):
     """Una entrada por alcaldía con coordenadas (centroide de sus colonias) y consumo agregado."""
     if anio is not None and not 1900 <= anio <= 2100:
@@ -613,7 +476,6 @@ def api_ubicaciones_colonias(
     bimestre: int | None = None,
     alcaldia: str | None = None,
     limit: int = 500,
-    _user: dict = Depends(require_auth),
 ):
     """Una entrada por colonia con coordenadas y consumo agregado."""
     limit = max(1, min(limit, MAX_LIMIT))
@@ -683,7 +545,6 @@ def api_alertas(
     metodo: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    _user: dict = Depends(require_auth),
 ):
     """Consulta las alertas de consumo anómalo detectadas por el pipeline de ML."""
     limit = max(1, min(limit, MAX_LIMIT))
@@ -709,16 +570,16 @@ def api_alertas(
         params.append(metodo)
 
     query = f"""
-        SELECT 
+        SELECT
             id_alerta, id_fact, alcaldia, colonia, anio, bimestre,
-            consumo_total, consumo_esperado, desviacion_porcentaje, 
+            consumo_total, consumo_esperado, desviacion_porcentaje,
             metodo, score, fecha_deteccion
         FROM alertas_consumo
         {where}
         ORDER BY ABS(desviacion_porcentaje) DESC
         LIMIT %s OFFSET %s;
     """
-    
+
     count_query = f"SELECT COUNT(*) AS total FROM alertas_consumo {where};"
 
     try:
@@ -757,7 +618,7 @@ def api_alertas(
 
 
 @app.get("/api/health")
-def health(_user: dict = Depends(require_auth)):
+def health():
     return {"status": "ok"}
 
 
@@ -766,7 +627,6 @@ def api_consumo_alcaldia(
     alcaldia: str,
     anio: int | None = None,
     bimestre: int | None = None,
-    _user: dict = Depends(require_auth),
 ):
     """Consulta a la BD el consumo de agua agregado de UNA alcaldía.
 
@@ -855,7 +715,7 @@ def api_consumo_alcaldia(
 
 
 @app.get("/api/geojson/alcaldias")
-def api_geojson_alcaldias(_user: dict = Depends(require_auth)):
+def api_geojson_alcaldias():
     """Sirve el GeoJSON de las 16 alcaldías de la CDMX.
 
     Prioridad:

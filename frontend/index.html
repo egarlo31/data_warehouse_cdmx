@@ -50,7 +50,7 @@
             gap: 15px;
         }
 
-        .btn-logout {
+        .btn-nav {
             background: rgba(255,255,255,0.2);
             color: white;
             border: none;
@@ -61,7 +61,7 @@
             transition: all 0.3s ease;
         }
 
-        .btn-logout:hover {
+        .btn-nav:hover {
             background: rgba(255,255,255,0.3);
             transform: translateY(-1px);
         }
@@ -331,8 +331,8 @@
         <div class="header">
             <h1>💧 Consumo de Agua en CDMX</h1>
             <div class="user-info">
-                <a href="mapa.html" class="btn-logout" style="text-decoration:none;">🗺️ Mapa</a>
-                <a href="alertas.html" class="btn-logout" style="text-decoration:none; background:#e53935;">🚨 Alertas</a>
+                <a href="mapa.html" class="btn-nav" style="text-decoration:none;">🗺️ Mapa</a>
+                <a href="alertas.html" class="btn-nav" style="text-decoration:none; background:#e53935;">🚨 Alertas</a>
             </div>
         </div>
 
@@ -444,20 +444,6 @@
 
         let paginaActual = 0;
         let totalRegistros = 0;
-
-        // ============ VALIDACIÓN DE AUTENTICACIÓN (Desactivada) ============
-        
-        function verificarAutenticacion() {
-            return true;
-        }
-
-        function mostrarUsuario() {
-            // No hacer nada
-        }
-
-        function cerrarSesion() {
-            // No hacer nada
-        }
 
         async function api(path) {
             const response = await fetch(`http://127.0.0.1:8000${path}`);
@@ -693,8 +679,6 @@
         }
 
         async function inicializar() {
-            if (!verificarAutenticacion()) return;
-            mostrarUsuario();
             await cargarCatalogos();
             await cargarDatos();
         }
