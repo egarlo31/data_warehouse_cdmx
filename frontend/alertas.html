@@ -444,8 +444,14 @@
         let paginaActual = 0;
         let totalRegistros = 0;
 
+        const API_URL = (window.location.protocol === 'file:' || 
+            ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
+             window.location.port !== '8000' && window.location.port !== ''))
+            ? 'http://127.0.0.1:8000'
+            : window.location.origin;
+
         async function api(path) {
-            const response = await fetch(`http://127.0.0.1:8000${path}`);
+            const response = await fetch(`${API_URL}${path}`);
             if (!response.ok) {
                 throw new Error("HTTP " + response.status);
             }
