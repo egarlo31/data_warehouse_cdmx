@@ -15,28 +15,39 @@ def main():
     # Cargar variables de entorno
     load_dotenv()
     
-    DB_HOST = os.getenv("DB_HOST", "localhost")
-    DB_PORT = int(os.getenv("DB_PORT", "5435"))
-    DB_NAME = os.getenv("DB_NAME", "dw_cdmx")
-    DB_USER = os.getenv("DB_USER", "emilio")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-    
-    if not DB_PASSWORD:
-        logger.error("DB_PASSWORD no está definida en el archivo .env")
-        return
+    url = os.getenv("DATABASE_URL")
+    if url:
+        logger.info("Usando DATABASE_URL para la conexión...")
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        try:
+            conn = psycopg2.connect(url)
+        except Exception as e:
+            logger.error("Error al conectar usando DATABASE_URL: %s", e)
+            return
+    else:
+        DB_HOST = os.getenv("DB_HOST", "localhost")
+        DB_PORT = int(os.getenv("DB_PORT", "5435"))
+        DB_NAME = os.getenv("DB_NAME", "dw_cdmx")
+        DB_USER = os.getenv("DB_USER", "emilio")
+        DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+        
+        if not DB_PASSWORD:
+            logger.error("DB_PASSWORD no está definida en el archivo .env ni se proporcionó DATABASE_URL")
+            return
 
-    logger.info("Conectando a la base de datos...")
-    try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
-        )
-    except Exception as e:
-        logger.error("Error al conectar a la base de datos: %s", e)
-        return
+        logger.info("Conectando a la base de datos local %s:%s...", DB_HOST, DB_PORT)
+        try:
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD
+            )
+        except Exception as e:
+            logger.error("Error al conectar a la base de datos: %s", e)
+            return
 
     try:
         logger.info("Cargando datos de fact_consumo_agua...")
