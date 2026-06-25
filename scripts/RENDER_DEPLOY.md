@@ -81,16 +81,24 @@ En Render, **New + → Web Service**:
 | Start Command       | `uvicorn main:app --host 0.0.0.0 --port $PORT`         |
 | Instance Type       | Free (Starter) o superior                              |
 
-Variables de entorno (Render las inyecta automáticamente si la BD está en
-el mismo region):
+### Variables de entorno
 
-| Variable          | Fuente                                                  |
+Si creas la base de datos **dentro del mismo Render account y region** y
+la vinculas al Web Service, Render inyecta automáticamente:
+
+| Variable       | Valor                                                    |
+| -------------- | -------------------------------------------------------- |
+| `DATABASE_URL` | Cadena `postgres://…` con host, puerto, user y password |
+
+**No hace falta** definir `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` ni
+`DB_PASSWORD` por separado. La app parsea `DATABASE_URL` directamente.
+Las variables individuales solo se usan como fallback para desarrollo
+local con `.env`.
+
+Variables que **sí** debes definir manualmente:
+
+| Variable          | Valor recomendado                                       |
 | ----------------- | ------------------------------------------------------- |
-| `DB_HOST`         | host del *Internal Database URL*                        |
-| `DB_PORT`         | `5432` (Render)                                         |
-| `DB_NAME`         | nombre de la BD (suele ser `dw_cdmx` o el que definas)  |
-| `DB_USER`         | usuario del *Internal Database URL*                     |
-| `DB_PASSWORD`     | contraseña del *Internal Database URL*                  |
 | `ALLOWED_ORIGINS` | URL pública del web service, p.ej. `https://dw-cdmx.onrender.com` |
 
 > **Nota**: ya no se necesitan `JWT_SECRET`, `JWT_ALGORITHM` ni

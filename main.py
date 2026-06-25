@@ -3,6 +3,7 @@ import json
 import logging
 import urllib.request
 from contextlib import contextmanager
+from urllib.parse import unquote_plus, urlparse
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -14,11 +15,36 @@ from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", "5435"))
-DB_NAME = os.getenv("DB_NAME", "dw_cdmx")
-DB_USER = os.getenv("DB_USER", "emilio")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
+def _resolve_db_config() -> tuple[str, int, str, str, str]:
+    """Devuelve (host, port, dbname, user, password).
+
+    Prioriza ``DATABASE_URL`` (que Render inyecta automáticamente al
+    provisionar Postgres) y cae a las variables ``DB_*`` individuales
+    para entornos locales.
+    """
+    url = os.getenv("DATABASE_URL")
+    if url:
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        p = urlparse(url)
+        return (
+            p.hostname or "localhost",
+            int(p.port) if p.port else 5432,
+            (p.path or "/").lstrip("/") or "postgres",
+            p.username or "",
+            unquote_plus(p.password) if p.password else "",
+        )
+    return (
+        os.getenv("DB_HOST", "localhost"),
+        int(os.getenv("DB_PORT", "5432")),
+        os.getenv("DB_NAME", "dw_cdmx"),
+        os.getenv("DB_USER", "emilio"),
+        os.getenv("DB_PASSWORD", ""),
+    )
+
+
+DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD = _resolve_db_config()
 
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
@@ -31,10 +57,14 @@ ALCALDIAS_GEOJSON_URL = (
 _geojson_cache: dict | None = None
 
 if not DB_PASSWORD:
-    raise RuntimeError("DB_PASSWORD must be defined in .env")
+    raise RuntimeError(
+        "DB_PASSWORD (or DATABASE_URL) must be defined. "
+        "Set DATABASE_URL on Render, or define DB_* in .env locally."
+    )
 
 logger = logging.getLogger("dw_cdmx")
 logging.basicConfig(level=logging.INFO)
+logger.info("Conectando a Postgres %s:%s/%s", DB_HOST, DB_PORT, DB_NAME)
 
 app = FastAPI()
 
