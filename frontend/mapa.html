@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de Consumo y Anomalías - CDMX</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Mapa de Consumo - CDMX</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -20,7 +23,6 @@
             padding: 20px;
         }
 
-        /* Header */
         .header {
             background: linear-gradient(135deg, #00897b 0%, #004d40 100%);
             color: white;
@@ -31,74 +33,31 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transition: background 0.5s ease;
         }
 
-        .header.modo-anomalias {
-            background: linear-gradient(135deg, #e53935 0%, #b71c1c 100%);
-        }
+        .header h1 { font-size: 24px; display: flex; align-items: center; gap: 10px; }
 
-        .header h1 {
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .nav { display: flex; gap: 8px; align-items: center; }
 
-        .badge-modo {
+        .nav a, .btn-logout {
             background: rgba(255,255,255,0.2);
             color: white;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .btn-nav {
-            background: rgba(255,255,255,0.2);
-            color: white;
+            text-decoration: none;
             border: none;
             padding: 8px 16px;
             border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
-            text-decoration: none;
-            font-weight: 500;
             transition: all 0.3s ease;
         }
 
-        .btn-nav:hover {
+        .nav a:hover, .btn-logout:hover {
             background: rgba(255,255,255,0.3);
             transform: translateY(-1px);
         }
 
-        .btn-alertas {
-            background: #e53935;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
+        .user-info { display: flex; align-items: center; gap: 15px; }
 
-        .btn-alertas:hover {
-            background: #b71c1c;
-            transform: translateY(-1px);
-        }
-
-        /* Filtros */
         .filters {
             background: white;
             border-radius: 20px;
@@ -135,7 +94,6 @@
         }
 
         .filter-group select:focus { outline: none; border-color: #00897b; }
-        .filters.modo-anomalias .filter-group select:focus { border-color: #e53935; }
 
         .actions { display: flex; gap: 10px; }
 
@@ -150,9 +108,6 @@
 
         .btn-primary { background: #00897b; color: white; }
         .btn-primary:hover { background: #00695c; transform: translateY(-1px); }
-        .filters.modo-anomalias .btn-primary { background: #e53935; }
-        .filters.modo-anomalias .btn-primary:hover { background: #b71c1c; }
-
         .btn-secondary { background: #e0e0e0; color: #333; }
         .btn-secondary:hover { background: #ccc; }
 
@@ -168,10 +123,9 @@
         .status.error { background: #fee; border-left-color: #c33; }
         .status.loading { background: #fff3e0; border-left-color: #ff9800; }
 
-        /* Layout */
         .layout {
             display: grid;
-            grid-template-columns: 1fr 340px;
+            grid-template-columns: 1fr 320px;
             gap: 20px;
         }
 
@@ -183,7 +137,7 @@
             min-height: 600px;
         }
 
-        #map { width: 100%; height: 72vh; min-height: 600px; }
+        #map { width: 100%; height: 70vh; min-height: 600px; }
 
         .legend {
             background: white;
@@ -208,32 +162,61 @@
         }
 
         .legend-swatch {
-            width: 24px;
-            height: 14px;
-            border-radius: 4px;
-            display: inline-block;
-            border: 1px solid rgba(0,0,0,0.15);
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.15);
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 14px 0;
+        }
+
+        .kpi-mini {
+            background: #f7f7f7;
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .kpi-mini .label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-mini .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #00897b;
+            margin-top: 4px;
         }
 
         .top-list {
-            margin-top: 10px;
             list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 260px;
+            overflow-y: auto;
         }
 
         .top-list li {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             padding: 8px 10px;
             border-radius: 8px;
             font-size: 13px;
-            margin: 4px 0;
         }
 
         .top-list li:nth-child(odd) { background: #f7f7f7; }
 
-        .top-list .name { color: #333; font-weight: 500; }
+        .top-list .name { color: #333; }
         .top-list .val { color: #00897b; font-weight: 600; }
-        .top-list.modo-anomalias .val { color: #e53935; }
 
         .selection-bar {
             display: none;
@@ -245,10 +228,6 @@
             margin-bottom: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             border-left: 4px solid #00897b;
-        }
-
-        .selection-bar.modo-anomalias {
-            border-left-color: #e53935;
         }
 
         .selection-bar.show { display: flex; }
@@ -264,9 +243,6 @@
             font-weight: 700;
             color: #00695c;
         }
-        .selection-bar.modo-anomalias .name {
-            color: #b71c1c;
-        }
 
         .selection-bar button {
             background: #00897b;
@@ -278,12 +254,8 @@
             font-size: 13px;
             font-weight: 600;
         }
-        .selection-bar.modo-anomalias button {
-            background: #e53935;
-        }
 
         .selection-bar button:hover { background: #00695c; }
-        .selection-bar.modo-anomalias button:hover { background: #b71c1c; }
 
         .leaflet-popup-content {
             font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -295,9 +267,6 @@
             font-weight: 700;
             color: #00695c;
             margin-bottom: 6px;
-        }
-        .popup-title.atípico {
-            color: #c62828;
         }
 
         .popup-row {
@@ -311,75 +280,53 @@
         .popup-row .v { color: #333; font-weight: 600; }
 
         .leaflet-interactive { cursor: pointer; }
-        .leaflet-interactive:hover { filter: brightness(1.03); }
+        .leaflet-interactive:hover { filter: brightness(1.05); }
 
         .detail-panel {
             background: white;
             border-radius: 16px;
             padding: 16px;
             margin: 12px 0;
-            border-left: 4px solid #00897b;
-            background: linear-gradient(135deg, #e0f2f1 0%, #ffffff 100%);
-            box-shadow: 0 2px 6px rgba(0, 137, 123, 0.15);
-            transition: all 0.3s ease;
+            border-left: 4px solid #ff6f00;
+            background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
+            box-shadow: 0 2px 6px rgba(255, 152, 0, 0.15);
         }
-        
-        .detail-panel.atípico {
-            border-left-color: #d32f2f;
-            background: linear-gradient(135deg, #ffebee 0%, #ffffff 100%);
-            box-shadow: 0 2px 6px rgba(211, 47, 47, 0.15);
-        }
-
         .detail-panel .detail-title {
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #00695c;
+            color: #e65100;
             font-weight: 600;
             margin-bottom: 4px;
         }
-        .detail-panel.atípico .detail-title {
-            color: #c62828;
-        }
-
         .detail-panel .detail-name {
             font-size: 17px;
             font-weight: 700;
-            color: #004d40;
+            color: #bf360c;
             margin-bottom: 10px;
         }
-        .detail-panel.atípico .detail-name {
-            color: #b71c1c;
-        }
-
         .detail-panel .detail-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
-
         .detail-panel .detail-cell {
             background: rgba(255,255,255,0.7);
             border-radius: 10px;
             padding: 8px;
             text-align: center;
         }
-
         .detail-panel .detail-cell .k {
             font-size: 10px;
             color: #666;
             text-transform: uppercase;
             letter-spacing: 0.4px;
         }
-
         .detail-panel .detail-cell .v {
             font-size: 15px;
             font-weight: 700;
-            color: #00796b;
+            color: #bf360c;
             margin-top: 2px;
-        }
-        .detail-panel.atípico .detail-cell .v {
-            color: #c62828;
         }
 
         @media (max-width: 1024px) {
@@ -396,27 +343,16 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
-        <div id="appHeader" class="header">
-            <h1>
-                <span>🗺️ Mapa de Monitoreo - CDMX</span>
-                <span id="badgeModo" class="badge-modo">Data Warehouse</span>
-            </h1>
+        <div class="header">
+            <h1>🗺️ Mapa de Consumo - CDMX</h1>
             <div class="user-info">
-                <a href="index.html" class="btn-nav">📊 Dashboard</a>
-                <a href="alertas.html" class="btn-alertas">🚨 Alertas</a>
+                <nav class="nav">
+                    <a href="index.html">📊 Dashboard</a>
+                </nav>
             </div>
         </div>
 
-        <!-- Filtros -->
-        <div id="filterSection" class="filters">
-            <div class="filter-group">
-                <label for="fVisualizacion">Visualización</label>
-                <select id="fVisualizacion" onchange="cambiarModoVisualizacion(this.value)">
-                    <option value="consumo" selected>💧 Consumo General</option>
-                    <option value="anomalias">🚨 Consumo Atípico (ML)</option>
-                </select>
-            </div>
+        <div class="filters">
             <div class="filter-group">
                 <label for="fAnio">Año</label>
                 <select id="fAnio"><option value="">Todos</option></select>
@@ -425,8 +361,14 @@
                 <label for="fBimestre">Bimestre</label>
                 <select id="fBimestre"><option value="">Todos</option></select>
             </div>
+            <div class="filter-group" style="display: flex; align-items: center; min-width: 220px; padding-bottom: 5px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; font-size: 13px; color: #d32f2f; margin-bottom: 0;">
+                    <input type="checkbox" id="showAnomalies" style="width: 18px; height: 18px; cursor: pointer;" onchange="toggleAnomalies()">
+                    <strong>⚠️ Consumos Atípicos (ML)</strong>
+                </label>
+            </div>
             <div class="actions">
-                <button class="btn btn-primary" onclick="aplicarFiltros()">🔍 Consultar</button>
+                <button class="btn btn-primary" onclick="cargarMapa()">🔍 Consultar</button>
                 <button class="btn btn-secondary" onclick="limpiarFiltros()">↺ Limpiar</button>
             </div>
         </div>
@@ -441,35 +383,41 @@
             <button onclick="limpiarSeleccion()">✕ Limpiar selección</button>
         </div>
 
-        <!-- Layout de Mapa y Panel -->
         <div class="layout">
             <div class="map-wrap">
                 <div id="map"></div>
             </div>
             <aside class="legend">
-                <!-- Panel lateral de Detalles -->
-                <div id="detailPanel" class="detail-panel" style="display:none;"></div>
-
-                <!-- Leyenda de colores -->
-                <h3 id="legendTitle">Intensidad de consumo</h3>
-                <div id="legendRows">
-                    <div class="legend-row"><span class="legend-swatch" style="background:#e0f2f1;"></span> Muy bajo</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#80cbc4;"></span> Bajo</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#26a69a;"></span> Medio</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#00897b;"></span> Alto</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#004d40;"></span> Muy alto</div>
+                <div id="detailPanel" class="detail-panel" style="display:none;">
+                    <div class="detail-title">💧 Datos de agua</div>
+                    <div class="detail-name" id="detailName">—</div>
+                    <div class="detail-grid">
+                        <div class="detail-cell"><div class="k">Consumo total</div><div class="v" id="detailTotal">—</div></div>
+                        <div class="detail-cell"><div class="k">Consumo prom.</div><div class="v" id="detailProm">—</div></div>
+                        <div class="detail-cell"><div class="k">🏠 Doméstico</div><div class="v" id="detailDom">—</div></div>
+                        <div class="detail-cell"><div class="k">🏢 No doméstico</div><div class="v" id="detailNoDom">—</div></div>
+                        <div class="detail-cell"><div class="k">🏬 Mixto</div><div class="v" id="detailMixto">—</div></div>
+                        <div class="detail-cell"><div class="k">Prom. dom.</div><div class="v" id="detailPromDom">—</div></div>
+                        <div class="detail-cell"><div class="k">Colonias</div><div class="v" id="detailColonias">—</div></div>
+                        <div class="detail-cell"><div class="k">Registros</div><div class="v" id="detailRegistros">—</div></div>
+                    </div>
                 </div>
 
-                <!-- Top List -->
-                <h3 id="topTitle" style="margin-top:18px;">📌 Top alcaldías</h3>
-                <ul id="topList" class="top-list"></ul>
+                <div id="anomaliesPanel" class="detail-panel" style="border-left-color: #d32f2f; background: linear-gradient(135deg, #ffebee 0%, #ffffff 100%); box-shadow: 0 2px 6px rgba(211, 47, 47, 0.15); margin-top: 15px; display: none;">
+                    <div class="detail-title" style="color: #c62828;">⚠️ Consumos Atípicos (ML)</div>
+                    <div class="detail-name" style="font-size:14px; color:#b71c1c; margin-bottom:8px;">Zonas con mayor anomalía:</div>
+                    <ul class="top-list" id="anomaliesList" style="max-height: 220px; overflow-y: auto;">
+                        <!-- Se llena dinámicamente -->
+                    </ul>
+                </div>
             </aside>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
     <script>
-        const GEOJSON_URL = "frontend/alcaldias.geojson"; // Localizado bajo /frontend para evitar 404
+        const API_URL = "http://127.0.0.1:8000";
+        const GEOJSON_URL = "/frontend/alcaldias.geojson";
         const fmt = n => n == null ? '—' : Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 });
         const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('es-MX');
 
@@ -482,7 +430,6 @@
         let alcaldiaSeleccionada = null;
         let layersByAlcaldia = new Map();
         let ultimoResultado = [];
-        let modoVisualizacion = 'consumo'; // 'consumo' o 'anomalias'
 
         function initMap() {
             map = L.map('map').setView(CDMX_CENTER, CDMX_ZOOM);
@@ -490,7 +437,6 @@
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             }).addTo(map);
-            
             map.on('click', (e) => {
                 if (e.originalEvent.target.closest('.leaflet-interactive')) return;
                 if (alcaldiaSeleccionada) limpiarSeleccion();
@@ -507,6 +453,51 @@
             document.getElementById('status').className = 'status';
         }
 
+        async function api(path) {
+            const response = await fetch(`${API_URL}${path}`);
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+        }
+
+        function buildQuery() {
+            const p = new URLSearchParams();
+            const vAnio = document.getElementById('fAnio').value;
+            const vBim = document.getElementById('fBimestre').value;
+            if (vAnio) p.append('anio', vAnio);
+            if (vBim) p.append('bimestre', vBim);
+            return p.toString();
+        }
+
+        async function consultarAguaAlcaldia(nombre) {
+            const p = new URLSearchParams();
+            p.append('alcaldia', nombre);
+            const vAnio = document.getElementById('fAnio').value;
+            const vBim = document.getElementById('fBimestre').value;
+            if (vAnio) p.append('anio', vAnio);
+            if (vBim) p.append('bimestre', vBim);
+            return await api('/api/consumo/alcaldia?' + p.toString());
+        }
+
+        function actualizarDetalleConDatosBD(d) {
+            if (!d) return;
+            const panel = document.getElementById('detailPanel');
+            panel.style.display = 'block';
+            const setTxt = (id, v, unit) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = v == null ? '—' : (unit ? fmt(v) + ' ' + unit : fmt(v));
+            };
+            document.getElementById('detailName').textContent = d.alcaldia;
+            setTxt('detailTotal', d.consumo_total, 'm³');
+            setTxt('detailProm', d.consumo_prom, 'm³');
+            setTxt('detailDom', d.consumo_total_dom, 'm³');
+            setTxt('detailNoDom', d.consumo_total_no_dom, 'm³');
+            setTxt('detailMixto', d.consumo_total_mixto, 'm³');
+            setTxt('detailPromDom', d.consumo_prom_dom, 'm³');
+            document.getElementById('detailColonias').textContent = d.num_colonias != null ? fmtInt(d.num_colonias) : '—';
+            document.getElementById('detailRegistros').textContent = d.num_registros != null ? fmtInt(d.num_registros) : '—';
+        }
+
         function norm(s) {
             return (s == null ? '' : String(s)).trim().toLowerCase()
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -521,34 +512,22 @@
         }
 
         function getColorChoropleth(t) {
-            if (t == null) return '#eceff1';
-            
-            if (modoVisualizacion === 'consumo') {
-                // Escala de verdes/azules (Consumo Normal)
-                if (t < 0.2) return '#e0f2f1';
-                if (t < 0.4) return '#80cbc4';
-                if (t < 0.6) return '#26a69a';
-                if (t < 0.8) return '#00897b';
-                return '#004d40';
-            } else {
-                // Escala de rojos (Consumo Atípico)
-                if (t === 0) return '#e8f5e9'; // Sin alertas = verde claro
-                if (t < 0.25) return '#ffebee';
-                if (t < 0.5) return '#ef9a9a';
-                if (t < 0.75) return '#e57373';
-                return '#c62828';
-            }
+            if (t == null || isNaN(t)) return '#cfd8dc';
+            if (t < 0.2) return '#e0f2f1';
+            if (t < 0.4) return '#80cbc4';
+            if (t < 0.6) return '#26a69a';
+            if (t < 0.8) return '#00897b';
+            return '#004d40';
         }
 
-        function estiloPoligonoNormal(valor, min, max) {
+        function estiloPoligonoNormal(consumo, min, max) {
             const range = max - min || 1;
-            const t = valor != null ? (valor - min) / range : null;
-            
+            const t = consumo != null ? (consumo - min) / range : null;
             return {
-                color: modoVisualizacion === 'consumo' ? '#00695c' : '#c62828',
+                color: '#00695c',
                 weight: 1.5,
                 fillColor: getColorChoropleth(t),
-                fillOpacity: valor === null ? 0.25 : 0.7,
+                fillOpacity: consumo == null ? 0.25 : 0.7,
             };
         }
 
@@ -561,9 +540,9 @@
             };
         }
 
-        function estiloPoligonoHover(valor, min, max) {
+        function estiloPoligonoHover(consumo, min, max) {
             const range = max - min || 1;
-            const t = valor != null ? (valor - min) / range : null;
+            const t = consumo != null ? (consumo - min) / range : null;
             return {
                 color: '#ff6f00',
                 weight: 2.5,
@@ -572,289 +551,68 @@
             };
         }
 
-        async function fetchBackendData() {
-            const anio = document.getElementById('fAnio').value;
-            const bim = document.getElementById('fBimestre').value;
-            
-            let queryParams = new URLSearchParams();
-            if (anio) queryParams.append('anio', anio);
-            if (bim) queryParams.append('bimestre', bim);
-
-            if (modoVisualizacion === 'consumo') {
-                // Consultar la API del DW de Consumo Agregado por Alcaldía
-                const res = await fetch(`http://127.0.0.1:8000/api/ubicaciones/alcaldias?${queryParams.toString()}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return await res.json();
-            } else {
-                // Consultar alertas de anomalías y agruparlas por alcaldía
-                queryParams.append('limit', '5000');
-                const resAlertas = await fetch(`http://127.0.0.1:8000/api/alertas?${queryParams.toString()}`);
-                if (!resAlertas.ok) throw new Error(`HTTP ${resAlertas.status}`);
-                const dataAlertas = await resAlertas.json();
-                
-                // Obtener catálogo de alcaldías para mapear todas (incluso con 0 alertas)
-                const resAlcaldias = await fetch('http://127.0.0.1:8000/api/alcaldias');
-                const listAlcaldias = await resAlcaldias.json();
-                
-                const agg = new Map();
-                listAlcaldias.forEach(alc => {
-                    agg.set(norm(alc), {
-                        alcaldia: alc,
-                        consumo_total: 0,
-                        num_alertas: 0,
-                        max_desviacion: 0,
-                        anomalias: [],
-                        sin_datos: false
-                    });
-                });
-                
-                // Mapear alertas en sus respectivas alcaldías
-                dataAlertas.data.forEach(a => {
-                    const k = norm(a.alcaldia);
-                    let item = agg.get(k);
-                    if (!item) {
-                        item = {
-                            alcaldia: a.alcaldia,
-                            consumo_total: 0,
-                            num_alertas: 0,
-                            max_desviacion: 0,
-                            anomalias: [],
-                            sin_datos: false
-                        };
-                        agg.set(k, item);
-                    }
-                    item.consumo_total += a.consumo_total;
-                    item.num_alertas += 1;
-                    item.max_desviacion = Math.max(item.max_desviacion, Math.abs(a.desviacion_porcentaje));
-                    item.anomalias.push(a);
-                });
-                
-                return Array.from(agg.values());
-            }
-        }
-
-        function consultarAlcaldiaLocal(nombre) {
-            const d = ultimoResultado.find(x => norm(x.alcaldia) === norm(nombre));
-            if (!d) {
-                return {
-                    alcaldia: nombre,
-                    consumo_total: 0,
-                    consumo_prom: 0,
-                    consumo_total_dom: 0,
-                    consumo_prom_dom: 0,
-                    consumo_total_mixto: 0,
-                    consumo_prom_mixto: 0,
-                    consumo_total_no_dom: 0,
-                    consumo_prom_no_dom: 0,
-                    num_colonias: 0,
-                    num_registros: 0,
-                    num_alertas: 0,
-                    max_desviacion: 0,
-                    anomalias: [],
-                    sin_datos: true,
-                };
-            }
-            return d;
-        }
-
-        function actualizarDetallePanel(d) {
-            const panel = document.getElementById('detailPanel');
-            if (!alcaldiaSeleccionada || !d) { panel.style.display = 'none'; return; }
-            panel.style.display = 'block';
-            
-            if (modoVisualizacion === 'consumo') {
-                panel.className = 'detail-panel';
-                panel.innerHTML = `
-                    <div class="detail-title">💧 Datos de agua</div>
-                    <div class="detail-name">${d.alcaldia}</div>
-                    <div class="detail-grid">
-                        <div class="detail-cell"><div class="k">Consumo total</div><div class="v">${fmt(d.consumo_total)} m³</div></div>
-                        <div class="detail-cell"><div class="k">Consumo prom.</div><div class="v">${fmt(d.consumo_prom)} m³</div></div>
-                        <div class="detail-cell"><div class="k">🏠 Doméstico</div><div class="v">${fmt(d.consumo_total_dom)} m³</div></div>
-                        <div class="detail-cell"><div class="k">🏢 No doméstico</div><div class="v">${fmt(d.consumo_total_no_dom)} m³</div></div>
-                        <div class="detail-cell"><div class="k">🏬 Mixto</div><div class="v">${fmt(d.consumo_total_mixto)} m³</div></div>
-                        <div class="detail-cell"><div class="k">Prom. dom.</div><div class="v">${fmt(d.consumo_prom_dom)} m³</div></div>
-                        <div class="detail-cell"><div class="k">Colonias</div><div class="v">${fmtInt(d.num_colonias)}</div></div>
-                        <div class="detail-cell"><div class="k">Registros</div><div class="v">${fmtInt(d.num_registros)}</div></div>
-                    </div>
-                `;
-            } else {
-                panel.className = 'detail-panel atípico';
-                const topAnoms = [...(d.anomalias || [])]
-                    .sort((a,b) => Math.abs(b.desviacion_porcentaje) - Math.abs(a.desviacion_porcentaje))
-                    .slice(0, 5);
-                    
-                const listHtml = topAnoms.map(a => `
-                    <div style="font-size:11px; margin-top:5px; border-bottom:1px dashed #ffcdd2; padding-bottom:4px;">
-                        <strong>${a.colonia}</strong> (Bim ${a.bimestre})<br>
-                        <span style="color:#c62828; font-weight:600;">Consumo: ${fmt(a.consumo_total)} m³</span> 
-                        <span style="color:#757575;">(Dev: +${fmt(a.desviacion_porcentaje)}%)</span>
-                    </div>
-                `).join('') || '<div style="font-size:12px;color:#757575;">Sin anomalías en este periodo</div>';
-
-                panel.innerHTML = `
-                    <div class="detail-title">🚨 Consumo Atípico</div>
-                    <div class="detail-name">${d.alcaldia}</div>
-                    <div class="detail-grid" style="margin-bottom: 12px;">
-                        <div class="detail-cell" style="grid-column: span 2;"><div class="k">Alertas Totales</div><div class="v">${d.num_alertas}</div></div>
-                        <div class="detail-cell"><div class="k">Desviación Máx</div><div class="v">+${fmt(d.max_desviacion)}%</div></div>
-                        <div class="detail-cell"><div class="k">Consumo total</div><div class="v">${fmt(d.consumo_total)} m³</div></div>
-                    </div>
-                    <div class="detail-title" style="color:#c62828; border-top:1px solid #ffcdd2; padding-top:8px; margin-bottom:4px;">Colonias Críticas</div>
-                    <div>${listHtml}</div>
-                `;
-            }
-        }
-
-        function buildPopupHtml(nombre, d) {
-            if (!d || d.sin_datos) {
-                return `<div class="popup-title">💧 ${nombre}</div>
-                    <div class="popup-row"><span class="k" style="color:#999;">Sin datos en el rango seleccionado</span></div>`;
-            }
-            
-            if (modoVisualizacion === 'consumo') {
-                return `<div class="popup-title">💧 CDMX: ${nombre}</div>
-                    <div class="popup-row"><span class="k">Consumo total</span><span class="v">${fmt(d.consumo_total)} m³</span></div>
-                    <div class="popup-row"><span class="k">Consumo prom.</span><span class="v">${fmt(d.consumo_prom)} m³</span></div>
-                    <div class="popup-row"><span class="k">Registros</span><span class="v">${fmtInt(d.num_registros)}</span></div>`;
-            } else {
-                return `<div class="popup-title atípico">🚨 Alertas: ${nombre}</div>
-                    <div class="popup-row"><span class="k">Anomalías detectadas</span><span class="v" style="color:#c62828;font-weight:700;">${d.num_alertas}</span></div>
-                    <div class="popup-row"><span class="k">Desviación Máxima</span><span class="v" style="color:#c62828;">+${fmt(d.max_desviacion)}%</span></div>
-                    <div class="popup-row"><span class="k">Consumo Sospechoso</span><span class="v">${fmt(d.consumo_total)} m³</span></div>`;
-            }
-        }
-
-        function renderMapa(data) {
-            renderAlcaldiasPoligonos(data);
-            renderTopList(data);
-        }
-
-        function renderTopList(data) {
-            const ul = document.getElementById('topList');
-            const title = document.getElementById('topTitle');
-            if (!ul) return;
-            
-            if (modoVisualizacion === 'consumo') {
-                title.textContent = '📌 Top alcaldías (Consumo)';
-                ul.className = 'top-list';
-                const top = [...data].sort((a, b) => (b.consumo_total || 0) - (a.consumo_total || 0)).slice(0, 8);
-                ul.innerHTML = top.map(d => `
-                    <li>
-                        <span class="name">${d.alcaldia}</span>
-                        <span class="val">${fmt(d.consumo_total)} m³</span>
-                    </li>
-                `).join('');
-            } else {
-                title.textContent = '🚨 Alcaldías con más anomalías';
-                ul.className = 'top-list modo-anomalias';
-                const top = [...data].sort((a, b) => (b.num_alertas || 0) - (a.num_alertas || 0)).slice(0, 8);
-                ul.innerHTML = top.map(d => `
-                    <li>
-                        <span class="name">${d.alcaldia}</span>
-                        <span class="val">${d.num_alertas} alertas</span>
-                    </li>
-                `).join('');
-            }
-        }
-
-        function aplicarEstiloSeleccion() {
-            if (!geoJsonLayer) return;
-            const data = ultimoResultado;
-            
-            const metricGetter = d => modoVisualizacion === 'consumo' ? (d.consumo_total || 0) : (d.num_alertas || 0);
-            const metrics = data.map(metricGetter);
-            const min = metrics.length ? Math.min(...metrics) : 0;
-            const max = metrics.length ? Math.max(...metrics) : 1;
-            
-            const dataByAlcaldia = new Map();
-            data.forEach(d => { if (d.alcaldia) dataByAlcaldia.set(d.alcaldia, d); });
-            const dataByNorm = new Map();
-            data.forEach(d => { if (d.alcaldia) dataByNorm.set(norm(d.alcaldia), d); });
-            
-            layersByAlcaldia.forEach((layer, nombre) => {
-                if (alcaldiaSeleccionada === nombre) {
-                    layer.setStyle(estiloPoligonoSel());
-                    layer.bringToFront();
-                } else {
-                    const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
-                    const val = d ? metricGetter(d) : null;
-                    layer.setStyle(estiloPoligonoNormal(val, min, max));
-                }
-            });
-        }
-
-        function seleccionarAlcaldia(nombre) {
-            alcaldiaSeleccionada = nombre;
-            document.getElementById('selectionName').textContent = nombre;
-            document.getElementById('selectionBar').classList.add('show');
-            aplicarEstiloSeleccion();
-            const d = consultarAlcaldiaLocal(nombre);
-            actualizarDetallePanel(d);
-        }
-
-        function limpiarSeleccion() {
-            alcaldiaSeleccionada = null;
-            document.getElementById('selectionBar').classList.remove('remove');
-            document.getElementById('selectionBar').classList.remove('show');
-            map.closePopup();
-            aplicarEstiloSeleccion();
-            actualizarDetallePanel(null);
-        }
-
         function renderAlcaldiasPoligonos(data) {
             if (geoJsonLayer) {
                 map.removeLayer(geoJsonLayer);
                 geoJsonLayer = null;
             }
             layersByAlcaldia.clear();
-            if (!alcaldiasGeoJson) return;
+            if (!alcaldiasGeoJson) {
+                setStatus('No se cargó el GeoJSON de alcaldías (alcaldias.geojson).', 'error');
+                return;
+            }
 
             const dataByAlcaldia = new Map();
             data.forEach(d => { if (d.alcaldia) dataByAlcaldia.set(d.alcaldia, d); });
             const dataByNorm = new Map();
             data.forEach(d => { if (d.alcaldia) dataByNorm.set(norm(d.alcaldia), d); });
 
-            const metricGetter = d => modoVisualizacion === 'consumo' ? (d.consumo_total || 0) : (d.num_alertas || 0);
-            const metrics = data.map(metricGetter);
-            const min = metrics.length ? Math.min(...metrics) : 0;
-            const max = metrics.length ? Math.max(...metrics) : 1;
+            const consumos = data.map(d => d.consumo_total || 0);
+            const min = consumos.length ? Math.min(...consumos) : 0;
+            const max = consumos.length ? Math.max(...consumos) : 1;
 
             geoJsonLayer = L.geoJSON(alcaldiasGeoJson, {
                 style: (feature) => {
                     const nombre = getNombreAlcaldia(feature.properties);
                     const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
-                    const val = d ? metricGetter(d) : null;
+                    const consumo = d ? (d.consumo_total || 0) : null;
                     if (alcaldiaSeleccionada && nombre === alcaldiaSeleccionada) {
                         return estiloPoligonoSel();
                     }
-                    return estiloPoligonoNormal(val, min, max);
+                    return estiloPoligonoNormal(consumo, min, max);
                 },
                 onEachFeature: (feature, layer) => {
                     const nombre = getNombreAlcaldia(feature.properties);
                     const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
 
-                    layer.bindPopup(buildPopupHtml(nombre, d));
+                    layer.bindPopup(buildPopupHtml(nombre, d, true));
 
-                    layer.on('click', (e) => {
+                    layer.on('click', async (e) => {
                         L.DomEvent.stopPropagation(e);
                         seleccionarAlcaldia(nombre);
-                        const datos = consultarAlcaldiaLocal(nombre);
-                        const layerRef = e.target;
-                        layerRef.setPopupContent(buildPopupHtml(nombre, datos));
-                        layerRef.openPopup(e.latlng);
+                        const popupCargando = `<div class="popup-title">💧 ${nombre}</div>
+                            <div class="popup-row"><span class="k" style="color:#888;">⏳ Consultando consumo en la BD...</span></div>`;
+                        layer.bindPopup(popupCargando).openPopup(e.latlng);
+                        try {
+                            const datos = await consultarAguaAlcaldia(nombre);
+                            const popup = layer.getPopup();
+                            if (popup) popup.setContent(buildPopupHtml(nombre, datos, true));
+                            actualizarDetalleConDatosBD(datos);
+                        } catch (err) {
+                            const popup = layer.getPopup();
+                            if (popup) popup.setContent(`<div class="popup-title">💧 ${nombre}</div>
+                                <div class="popup-row"><span class="k" style="color:#c33;">❌ Error: ${err.message}</span></div>`);
+                        }
                     });
 
                     layer.on('mouseover', (e) => {
                         const t = e.target;
                         if (alcaldiaSeleccionada !== nombre) {
                             const dLocal = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
-                            const val = dLocal ? metricGetter(dLocal) : null;
-                            t.setStyle(estiloPoligonoHover(val, min, max));
+                            t.setStyle(estiloPoligonoHover(dLocal ? (dLocal.consumo_total || 0) : null, min, max));
                         }
                         t.bringToFront();
                     });
-                    
                     layer.on('mouseout', (e) => {
                         const t = e.target;
                         if (alcaldiaSeleccionada !== nombre && geoJsonLayer) {
@@ -872,73 +630,207 @@
             } catch (e) {}
         }
 
-        async function aplicarFiltros() {
-            setStatus('Cargando datos del Data Warehouse...', 'loading');
-            try {
-                const data = await fetchBackendData();
-                ultimoResultado = data;
-                renderMapa(ultimoResultado);
-                hideStatus();
-                if (alcaldiaSeleccionada) {
-                    const d = consultarAlcaldiaLocal(alcaldiaSeleccionada);
-                    actualizarDetallePanel(d);
+        function buildPopupHtml(nombre, d, esPoligono) {
+            if (!d || d.sin_datos) {
+                return `<div class="popup-title">💧 ${nombre}</div>
+                    <div class="popup-row"><span class="k" style="color:#999;">Sin datos de agua para los filtros</span></div>
+                    ${esPoligono ? `<div class="popup-hint" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:11px;color:#888;">💧 La BD no tiene registros</div>` : ''}`;
+            }
+            const row = (k, v, unidad = 'm³') =>
+                v != null ? `<div class="popup-row"><span class="k">${k}</span><span class="v">${fmt(v)} ${unidad}</span></div>` : '';
+            const rowInt = (k, v) =>
+                v != null ? `<div class="popup-row"><span class="k">${k}</span><span class="v">${fmtInt(v)}</span></div>` : '';
+
+            const desglose = (d.consumo_total_dom != null || d.consumo_total_mixto != null || d.consumo_total_no_dom != null)
+                ? `<div style="margin-top:8px;padding-top:6px;border-top:1px dashed #ddd;">
+                       <div class="popup-section" style="font-size:11px;font-weight:700;color:#00695c;margin-bottom:4px;letter-spacing:0.3px;">DESGLOSE POR TIPO</div>
+                       ${row('🏠 Doméstico', d.consumo_total_dom)}
+                       ${row('🏢 No doméstico', d.consumo_total_no_dom)}
+                       ${row('🏬 Mixto', d.consumo_total_mixto)}
+                   </div>` : '';
+
+            const rangoAnios = (d.anio_min != null && d.anio_max != null)
+                ? `<div style="margin-top:6px;font-size:11px;color:#888;text-align:right;">Período: ${d.anio_min}${d.anio_min !== d.anio_max ? '–' + d.anio_max : ''}</div>`
+                : '';
+
+            return `<div class="popup-title">💧 ${nombre}</div>
+                <div class="popup-row"><span class="k">Consumo total</span><span class="v">${fmt(d.consumo_total)} m³</span></div>
+                <div class="popup-row"><span class="k">Consumo prom.</span><span class="v">${fmt(d.consumo_prom)} m³</span></div>
+                ${rowInt('Colonias', d.num_colonias)}
+                ${rowInt('Registros', d.num_registros)}
+                ${desglose}
+                ${rangoAnios}`;
+        }
+
+        function renderMapa(data) {
+            renderAlcaldiasPoligonos(data);
+            renderDetailPanel(data);
+        }
+
+        function renderDetailPanel(data) {
+            const panel = document.getElementById('detailPanel');
+            if (!alcaldiaSeleccionada) { panel.style.display = 'none'; return; }
+            const d = data.find(x => x.alcaldia === alcaldiaSeleccionada)
+                || data.find(x => norm(x.alcaldia) === norm(alcaldiaSeleccionada));
+            if (!d) { panel.style.display = 'none'; return; }
+            panel.style.display = 'block';
+            const setTxt = (id, v, unit) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = v == null ? '—' : (unit ? fmt(v) + ' ' + unit : fmt(v));
+            };
+            document.getElementById('detailName').textContent = d.alcaldia;
+            setTxt('detailTotal', d.consumo_total, 'm³');
+            setTxt('detailProm', d.consumo_prom, 'm³');
+            setTxt('detailDom', d.consumo_total_dom, 'm³');
+            setTxt('detailNoDom', d.consumo_total_no_dom, 'm³');
+            setTxt('detailMixto', d.consumo_total_mixto, 'm³');
+            setTxt('detailPromDom', d.consumo_prom_dom, 'm³');
+            document.getElementById('detailColonias').textContent = d.num_colonias != null ? fmtInt(d.num_colonias) : '—';
+            document.getElementById('detailRegistros').textContent = d.num_registros != null ? fmtInt(d.num_registros) : '—';
+        }
+
+        function aplicarEstiloSeleccion() {
+            if (!geoJsonLayer) return;
+            const data = ultimoResultado;
+            const dataByAlcaldia = new Map();
+            data.forEach(d => { if (d.alcaldia) dataByAlcaldia.set(d.alcaldia, d); });
+            const dataByNorm = new Map();
+            data.forEach(d => { if (d.alcaldia) dataByNorm.set(norm(d.alcaldia), d); });
+            const consumos = data.map(d => d.consumo_total || 0);
+            const min = consumos.length ? Math.min(...consumos) : 0;
+            const max = consumos.length ? Math.max(...consumos) : 1;
+            layersByAlcaldia.forEach((layer, nombre) => {
+                if (alcaldiaSeleccionada === nombre) {
+                    layer.setStyle(estiloPoligonoSel());
+                    layer.bringToFront();
+                } else {
+                    const d = dataByAlcaldia.get(nombre) || dataByNorm.get(norm(nombre));
+                    const consumo = d ? (d.consumo_total || 0) : null;
+                    layer.setStyle(estiloPoligonoNormal(consumo, min, max));
                 }
+            });
+        }
+
+        function seleccionarAlcaldia(nombre) {
+            alcaldiaSeleccionada = nombre;
+            document.getElementById('selectionName').textContent = nombre;
+            document.getElementById('selectionBar').classList.add('show');
+            aplicarEstiloSeleccion();
+            renderDetailPanel(ultimoResultado);
+        }
+
+        function limpiarSeleccion() {
+            alcaldiaSeleccionada = null;
+            document.getElementById('selectionBar').classList.remove('show');
+            map.closePopup();
+            aplicarEstiloSeleccion();
+            renderDetailPanel(ultimoResultado);
+        }
+
+
+
+        let anomalyMarkers = [];
+
+        async function cargarAnomalias() {
+            const showAnomaliesCheckbox = document.getElementById('showAnomalies');
+            const panel = document.getElementById('anomaliesPanel');
+            if (!showAnomaliesCheckbox.checked) {
+                anomalyMarkers.forEach(m => map.removeLayer(m));
+                anomalyMarkers = [];
+                panel.style.display = 'none';
+                return;
+            }
+
+            try {
+                const q = buildQuery();
+                const anomalies = await api(`/api/alertas?limit=100&${q}`);
+                
+                anomalyMarkers.forEach(m => map.removeLayer(m));
+                anomalyMarkers = [];
+                
+                panel.style.display = 'block';
+                const listEl = document.getElementById('anomaliesList');
+                listEl.innerHTML = '';
+                
+                if (anomalies.length === 0) {
+                    listEl.innerHTML = '<li style="justify-content: center; color: #666; padding: 10px;">No se detectaron anomalías</li>';
+                    return;
+                }
+                
+                anomalies.forEach((anomaly, index) => {
+                    if (anomaly.lat && anomaly.lon) {
+                        const radius = 6 + (anomaly.score * 8);
+                        const marker = L.circleMarker([anomaly.lat, anomaly.lon], {
+                            color: '#d32f2f',
+                            fillColor: '#f44336',
+                            fillOpacity: 0.75,
+                            weight: 2,
+                            radius: radius
+                        }).addTo(map);
+                        
+                        const popupHtml = `
+                            <div class="popup-title" style="color: #c62828; font-weight: bold; margin-bottom: 6px;">⚠️ Consumo Atípico (ML)</div>
+                            <div class="popup-row"><span class="k">Colonia:</span><span class="v">${anomaly.colonia}</span></div>
+                            <div class="popup-row"><span class="k">Alcaldía:</span><span class="v">${anomaly.alcaldia}</span></div>
+                            <div class="popup-row"><span class="k">Año - Bim:</span><span class="v">${anomaly.anio} - Bim ${anomaly.bimestre}</span></div>
+                            <div class="popup-row"><span class="k">Consumo total:</span><span class="v" style="color:#d32f2f;">${fmt(anomaly.consumo_total)} m³</span></div>
+                            <div class="popup-row"><span class="k">Consumo esperado:</span><span class="v">${fmt(anomaly.consumo_esperado)} m³</span></div>
+                            <div class="popup-row"><span class="k">Desviación:</span><span class="v" style="color:#d32f2f; font-weight:bold;">+${fmt(anomaly.desviacion_porcentaje)}%</span></div>
+                            <div class="popup-row"><span class="k">ML Score:</span><span class="v" style="color:#c62828; font-weight:bold;">${fmt(anomaly.score * 100)}%</span></div>
+                        `;
+                        marker.bindPopup(popupHtml);
+                        anomalyMarkers.push(marker);
+                        
+                        if (index < 15) {
+                            const li = document.createElement('li');
+                            li.style.cursor = 'pointer';
+                            li.style.padding = '8px 10px';
+                            li.style.display = 'flex';
+                            li.style.justifyContent = 'space-between';
+                            li.style.alignItems = 'center';
+                            li.style.borderBottom = '1px solid #ffe0e0';
+                            
+                            if (index % 2 === 1) {
+                                li.style.background = 'rgba(255, 235, 235, 0.3)';
+                            }
+                            
+                            li.innerHTML = `
+                                <div style="display: flex; flex-direction: column; width: 75%; text-align: left;">
+                                    <span style="font-weight: bold; color: #b71c1c; font-size: 12px;">${index + 1}. ${anomaly.colonia}</span>
+                                    <span style="font-size: 11px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${anomaly.alcaldia} | +${fmt(anomaly.desviacion_porcentaje)}%</span>
+                                </div>
+                                <span style="color: #d32f2f; font-weight: bold; font-size: 12px;">${fmt(anomaly.score * 100)}%</span>
+                            `;
+                            
+                            li.onclick = () => {
+                                map.setView([anomaly.lat, anomaly.lon], 14);
+                                marker.openPopup();
+                            };
+                            listEl.appendChild(li);
+                        }
+                    }
+                });
             } catch (e) {
-                setStatus('Error al actualizar datos: ' + e.message, 'error');
+                console.error("Error al cargar anomalías: ", e);
             }
         }
 
-        function limpiarFiltros() {
-            ['fAnio', 'fBimestre'].forEach(id => document.getElementById(id).value = '');
-            aplicarFiltros();
+        async function toggleAnomalies() {
+            await cargarAnomalias();
         }
 
-        function cambiarModoVisualizacion(valor) {
-            modoVisualizacion = valor;
-            
-            // Adaptar interfaz
-            const header = document.getElementById('appHeader');
-            const filterSec = document.getElementById('filterSection');
-            const selectionBar = document.getElementById('selectionBar');
-            const badge = document.getElementById('badgeModo');
-            
-            const legendTitle = document.getElementById('legendTitle');
-            const legendRows = document.getElementById('legendRows');
-            
-            if (modoVisualizacion === 'consumo') {
-                header.classList.remove('modo-anomalias');
-                filterSec.classList.remove('modo-anomalias');
-                selectionBar.classList.remove('modo-anomalias');
-                badge.textContent = 'Data Warehouse';
-                badge.style.background = 'rgba(255,255,255,0.2)';
-                
-                legendTitle.textContent = 'Intensidad de consumo';
-                legendRows.innerHTML = `
-                    <div class="legend-row"><span class="legend-swatch" style="background:#e0f2f1;"></span> Muy bajo</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#80cbc4;"></span> Bajo</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#26a69a;"></span> Medio</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#00897b;"></span> Alto</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#004d40;"></span> Muy alto</div>
-                `;
-            } else {
-                header.classList.add('modo-anomalias');
-                filterSec.classList.add('modo-anomalias');
-                selectionBar.classList.add('modo-anomalias');
-                badge.textContent = 'Detección de Anomalías (ML)';
-                badge.style.background = '#b71c1c';
-                
-                legendTitle.textContent = 'Alertas de Anomalías';
-                legendRows.innerHTML = `
-                    <div class="legend-row"><span class="legend-swatch" style="background:#e8f5e9;"></span> Sin anomalías (0)</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#ffebee;"></span> Muy bajo</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#ef9a9a;"></span> Bajo</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#e57373;"></span> Medio</div>
-                    <div class="legend-row"><span class="legend-swatch" style="background:#c62828;"></span> Alto</div>
-                `;
+        async function cargarMapa() {
+            setStatus('Cargando datos geográficos...', 'loading');
+            try {
+                const q = buildQuery();
+                ultimoResultado = await api(`/api/ubicaciones/alcaldias?${q}`);
+                renderMapa(ultimoResultado);
+                await cargarAnomalias();
+                hideStatus();
+            } catch (e) {
+                setStatus('Error: ' + e.message, 'error');
             }
-            
-            limpiarSeleccion();
-            aplicarFiltros();
         }
 
         async function cargarGeojsonAlcaldias() {
@@ -947,32 +839,40 @@
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 alcaldiasGeoJson = await r.json();
             } catch (e) {
-                setStatus(`No se pudo cargar el mapa GeoJSON (${e.message}). Asegúrate de iniciar con uvicorn.`, 'error');
+                setStatus(`No se pudo cargar ${GEOJSON_URL} (${e.message}). Descárgalo y colócalo junto a este HTML.`, 'error');
             }
         }
 
         async function cargarCatalogos() {
             try {
                 const [anios, bimestres] = await Promise.all([
-                    fetch('http://127.0.0.1:8000/api/anios').then(r => r.json()),
-                    fetch('http://127.0.0.1:8000/api/bimestres').then(r => r.json())
+                    api('/api/anios'),
+                    api('/api/bimestres'),
                 ]);
-                
                 const selAnio = document.getElementById('fAnio');
                 anios.forEach(v => selAnio.add(new Option(v, v)));
-                
                 const selBim = document.getElementById('fBimestre');
-                bimestres.forEach(v => selBim.add(new Option('Bimestre ' + v, v)));
+                bimestres.forEach(v => selBim.add(new Option('Bim ' + v, v)));
             } catch (e) {
-                console.error("Error al cargar los catálogos de años y bimestres", e);
+                setStatus('Error al cargar catálogos: ' + e.message, 'error');
             }
+        }
+
+        function limpiarFiltros() {
+            ['fAnio', 'fBimestre'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('showAnomalies').checked = false;
+            anomalyMarkers.forEach(m => map.removeLayer(m));
+            anomalyMarkers = [];
+            const panel = document.getElementById('anomaliesPanel');
+            if (panel) panel.style.display = 'none';
+            cargarMapa();
         }
 
         async function inicializar() {
             initMap();
             await cargarGeojsonAlcaldias();
             await cargarCatalogos();
-            await aplicarFiltros();
+            await cargarMapa();
         }
 
         inicializar();

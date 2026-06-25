@@ -3,7 +3,7 @@ import json
 import logging
 import urllib.request
 from contextlib import contextmanager
-from urllib.parse import unquote_plus, urlparse
+from urllib.parse import urlparse, unquote_plus
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -17,7 +17,7 @@ load_dotenv()
 
 
 def _resolve_db_config() -> tuple[str, int, str, str, str]:
-    """Devuelve (host, port, dbname, user, password).
+    """Resuelve la configuración de conexión de la BD.
 
     Prioriza ``DATABASE_URL`` (que Render inyecta automáticamente al
     provisionar Postgres) y cae a las variables ``DB_*`` individuales
@@ -37,7 +37,7 @@ def _resolve_db_config() -> tuple[str, int, str, str, str]:
         )
     return (
         os.getenv("DB_HOST", "localhost"),
-        int(os.getenv("DB_PORT", "5432")),
+        int(os.getenv("DB_PORT", "5435")),
         os.getenv("DB_NAME", "dw_cdmx"),
         os.getenv("DB_USER", "emilio"),
         os.getenv("DB_PASSWORD", ""),
@@ -73,7 +73,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS or [],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
@@ -93,14 +93,6 @@ def serve_index():
 def serve_mapa():
     return FileResponse(
         "frontend/mapa.html",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-    )
-
-
-@app.get("/alertas.html")
-def serve_alertas():
-    return FileResponse(
-        "frontend/alertas.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
@@ -282,7 +274,9 @@ def api_top_consumo(limit: int = 10):
 
 
 @app.get("/api/correlacion")
-def api_correlacion(anio: int | None = None):
+def api_correlacion(
+    anio: int | None = None,
+):
     """Correlación por bimestre entre consumo de agua y clima (temperatura, lluvia, días extremos)."""
     if anio is not None and not 1900 <= anio <= 2100:
         raise HTTPException(status_code=400, detail="anio fuera de rango")
@@ -566,87 +560,6 @@ def api_ubicaciones_colonias(
     ]
 
 
-@app.get("/api/alertas")
-def api_alertas(
-    alcaldia: str | None = None,
-    colonia: str | None = None,
-    anio: int | None = None,
-    bimestre: int | None = None,
-    metodo: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
-):
-    """Consulta las alertas de consumo anómalo detectadas por el pipeline de ML."""
-    limit = max(1, min(limit, MAX_LIMIT))
-    offset = max(0, offset)
-
-    where = " WHERE 1=1"
-    params = []
-
-    if alcaldia:
-        where += " AND alcaldia ILIKE %s"
-        params.append(f"%{alcaldia}%")
-    if colonia:
-        where += " AND colonia ILIKE %s"
-        params.append(f"%{colonia}%")
-    if anio is not None:
-        where += " AND anio = %s"
-        params.append(anio)
-    if bimestre is not None:
-        where += " AND bimestre = %s"
-        params.append(bimestre)
-    if metodo:
-        where += " AND metodo = %s"
-        params.append(metodo)
-
-    query = f"""
-        SELECT
-            id_alerta, id_fact, alcaldia, colonia, anio, bimestre,
-            consumo_total, consumo_esperado, desviacion_porcentaje,
-            metodo, score, fecha_deteccion
-        FROM alertas_consumo
-        {where}
-        ORDER BY ABS(desviacion_porcentaje) DESC
-        LIMIT %s OFFSET %s;
-    """
-
-    count_query = f"SELECT COUNT(*) AS total FROM alertas_consumo {where};"
-
-    try:
-        with get_cursor() as (conn, cur):
-            cur.execute(count_query, params)
-            total = cur.fetchone()["total"]
-
-            cur.execute(query, params + [limit, offset])
-            rows = cur.fetchall()
-    except Exception as exc:
-        logger.exception("api_alertas error: %s", exc)
-        raise _generic_500()
-
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "data": [
-            {
-                "id_alerta": r["id_alerta"],
-                "id_fact": r["id_fact"],
-                "alcaldia": r["alcaldia"],
-                "colonia": r["colonia"],
-                "anio": r["anio"],
-                "bimestre": r["bimestre"],
-                "consumo_total": float(r["consumo_total"] or 0),
-                "consumo_esperado": float(r["consumo_esperado"] or 0),
-                "desviacion_porcentaje": float(r["desviacion_porcentaje"] or 0),
-                "metodo": r["metodo"],
-                "score": float(r["score"] or 0),
-                "fecha_deteccion": r["fecha_deteccion"].isoformat() if r["fecha_deteccion"] else None,
-            }
-            for r in rows
-        ],
-    }
-
-
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -781,3 +694,70 @@ def api_geojson_alcaldias():
                 f"({exc})"
             ),
         )
+
+
+@app.get("/api/alertas")
+def api_alertas(
+    alcaldia: str | None = None,
+    anio: int | None = None,
+    bimestre: int | None = None,
+    min_score: float = 0.0,
+    limit: int = 100,
+):
+    """Obtiene registros de consumos atípicos (alertas) detectados por el modelo de ML."""
+    limit = max(1, min(limit, MAX_LIMIT))
+    where = " WHERE 1=1"
+    params = []
+    
+    if alcaldia:
+        where += " AND a.alcaldia ILIKE %s"
+        params.append(f"%{alcaldia}%")
+    if anio is not None:
+        where += " AND a.anio = %s"
+        params.append(anio)
+    if bimestre is not None:
+        where += " AND a.bimestre = %s"
+        params.append(bimestre)
+    if min_score > 0.0:
+        where += " AND a.score >= %s"
+        params.append(min_score)
+        
+    query = f"""
+        SELECT 
+            a.id_alerta, a.id_fact, a.alcaldia, a.colonia, a.anio, a.bimestre,
+            a.consumo_total, a.consumo_esperado, a.desviacion_porcentaje,
+            a.metodo, a.score, u.latitud, u.longitud
+        FROM alertas_consumo a
+        JOIN fact_consumo_agua f ON a.id_fact = f.id_fact
+        JOIN dim_ubicacion u ON f.id_ubicacion = u.id_ubicacion
+        {where}
+        ORDER BY a.score DESC
+        LIMIT %s;
+    """
+    params.append(limit)
+    try:
+        with get_cursor() as (conn, cur):
+            cur.execute(query, params)
+            rows = cur.fetchall()
+    except Exception as exc:
+        logger.exception("api_alertas error: %s", exc)
+        raise _generic_500()
+        
+    return [
+        {
+            "id_alerta": r["id_alerta"],
+            "id_fact": r["id_fact"],
+            "alcaldia": r["alcaldia"],
+            "colonia": r["colonia"],
+            "anio": r["anio"],
+            "bimestre": r["bimestre"],
+            "consumo_total": float(r["consumo_total"] or 0),
+            "consumo_esperado": float(r["consumo_esperado"] or 0),
+            "desviacion_porcentaje": float(r["desviacion_porcentaje"] or 0),
+            "metodo": r["metodo"],
+            "score": float(r["score"] or 0),
+            "lat": float(r["latitud"] or 0) if r["latitud"] is not None else None,
+            "lon": float(r["longitud"] or 0) if r["longitud"] is not None else None,
+        }
+        for r in rows
+    ]

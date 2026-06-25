@@ -31,9 +31,7 @@ The system allows users to:
 data_warehouse_cdmx/
 │
 ├── frontend/
-│   ├── index.html
-│   ├── mapa.html
-│   └── alertas.html
+│   └── index.html
 │
 ├── data_warehouse_cdmx/
 │   └── SQL scripts and database configuration
@@ -52,7 +50,6 @@ data_warehouse_cdmx/
 * Interactive frontend
 * Data filtering and visualization
 * Geographic consultation using coordinates
-* Anomaly detection alerts (IQR + Isolation Forest)
 
 ---
 
