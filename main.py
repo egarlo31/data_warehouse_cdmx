@@ -164,10 +164,10 @@ def api_consumo(
         query += " AND t.bimestre = %s"
         params.append(bimestre)
     if alcaldia:
-        query += " AND u.alcaldia ILIKE %s"
+        query += " AND unaccent(u.alcaldia) ILIKE unaccent(%s)"
         params.append(f"%{alcaldia}%")
     if colonia:
-        query += " AND u.colonia = %s"
+        query += " AND unaccent(u.colonia) = unaccent(%s)"
         params.append(colonia)
     if indice_des:
         query += " AND i.indice_des = %s"
@@ -211,21 +211,58 @@ def api_consumo(
 
 
 @app.get("/api/consumo/resumen")
-def api_resumen():
+def api_resumen(
+    anio: int | None = None,
+    bimestre: int | None = None,
+    alcaldia: str | None = None,
+    colonia: str | None = None,
+    indice_des: str | None = None,
+):
+    """Resumen por (alcaldía, colonia) con totales y promedios.
+
+    Acepta los mismos filtros que ``/api/consumo`` para que el botón
+    "Consultar" del dashboard refleje realmente los filtros aplicados.
+    """
+    if bimestre is not None and not 1 <= bimestre <= 6:
+        raise HTTPException(status_code=400, detail="bimestre debe estar entre 1 y 6")
+    if anio is not None and not 1900 <= anio <= 2100:
+        raise HTTPException(status_code=400, detail="anio fuera de rango")
+
+    where = " WHERE 1=1"
+    params: list = []
+    if anio is not None:
+        where += " AND t.anio = %s"
+        params.append(anio)
+    if bimestre is not None:
+        where += " AND t.bimestre = %s"
+        params.append(bimestre)
+    if alcaldia:
+        where += " AND unaccent(u.alcaldia) ILIKE unaccent(%s)"
+        params.append(f"%{alcaldia}%")
+    if colonia:
+        where += " AND unaccent(u.colonia) = unaccent(%s)"
+        params.append(colonia)
+    if indice_des:
+        where += " AND i.indice_des = %s"
+        params.append(indice_des)
+
+    query = f"""
+        SELECT u.alcaldia, u.colonia,
+               SUM(f.consumo_total) AS total_agua,
+               AVG(f.consumo_prom) AS promedio
+        FROM fact_consumo_agua f
+        JOIN dim_tiempo t       ON f.id_tiempo = t.id_tiempo
+        JOIN dim_ubicacion u    ON f.id_ubicacion = u.id_ubicacion
+        JOIN dim_indice_des i   ON f.id_indice_des = i.id_indice_des
+        {where}
+        GROUP BY u.alcaldia, u.colonia
+        ORDER BY total_agua DESC NULLS LAST
+        LIMIT %s;
+    """
+    params.append(MAX_LIMIT)
     try:
         with get_cursor() as (conn, cur):
-            cur.execute(
-                """
-                SELECT u.alcaldia, u.colonia,
-                       SUM(f.consumo_total) AS total_agua,
-                       AVG(f.consumo_prom) AS promedio
-                FROM fact_consumo_agua f
-                JOIN dim_ubicacion u ON f.id_ubicacion = u.id_ubicacion
-                GROUP BY u.alcaldia, u.colonia
-                LIMIT %s;
-                """,
-                (MAX_LIMIT,),
-            )
+            cur.execute(query, params)
             rows = cur.fetchall()
     except Exception as exc:
         logger.exception("api_resumen error: %s", exc)
@@ -243,21 +280,55 @@ def api_resumen():
 
 
 @app.get("/api/top-consumo")
-def api_top_consumo(limit: int = 10):
+def api_top_consumo(
+    limit: int = 10,
+    anio: int | None = None,
+    bimestre: int | None = None,
+    alcaldia: str | None = None,
+    colonia: str | None = None,
+    indice_des: str | None = None,
+):
+    """Top N (alcaldía, colonia) por consumo total. Acepta los mismos filtros que
+    ``/api/consumo`` para que el botón "Consultar" del dashboard realmente filtre."""
     limit = max(1, min(limit, MAX_LIMIT))
+    if bimestre is not None and not 1 <= bimestre <= 6:
+        raise HTTPException(status_code=400, detail="bimestre debe estar entre 1 y 6")
+    if anio is not None and not 1900 <= anio <= 2100:
+        raise HTTPException(status_code=400, detail="anio fuera de rango")
+
+    where = " WHERE 1=1"
+    params: list = []
+    if anio is not None:
+        where += " AND t.anio = %s"
+        params.append(anio)
+    if bimestre is not None:
+        where += " AND t.bimestre = %s"
+        params.append(bimestre)
+    if alcaldia:
+        where += " AND unaccent(u.alcaldia) ILIKE unaccent(%s)"
+        params.append(f"%{alcaldia}%")
+    if colonia:
+        where += " AND unaccent(u.colonia) = unaccent(%s)"
+        params.append(colonia)
+    if indice_des:
+        where += " AND i.indice_des = %s"
+        params.append(indice_des)
+
+    query = f"""
+        SELECT u.colonia, u.alcaldia, SUM(f.consumo_total) AS total_agua
+        FROM fact_consumo_agua f
+        JOIN dim_tiempo t       ON f.id_tiempo = t.id_tiempo
+        JOIN dim_ubicacion u    ON f.id_ubicacion = u.id_ubicacion
+        JOIN dim_indice_des i   ON f.id_indice_des = i.id_indice_des
+        {where}
+        GROUP BY u.colonia, u.alcaldia
+        ORDER BY total_agua DESC
+        LIMIT %s;
+    """
+    params.append(limit)
     try:
         with get_cursor() as (conn, cur):
-            cur.execute(
-                """
-                SELECT u.colonia, u.alcaldia, SUM(f.consumo_total) AS total_agua
-                FROM fact_consumo_agua f
-                JOIN dim_ubicacion u ON f.id_ubicacion = u.id_ubicacion
-                GROUP BY u.colonia, u.alcaldia
-                ORDER BY total_agua DESC
-                LIMIT %s;
-                """,
-                (limit,),
-            )
+            cur.execute(query, params)
             rows = cur.fetchall()
     except Exception as exc:
         logger.exception("api_top_consumo error: %s", exc)
@@ -402,7 +473,7 @@ def api_colonias(alcaldia: str | None = None):
         with get_cursor() as (conn, cur):
             if alcaldia:
                 cur.execute(
-                    "SELECT DISTINCT colonia FROM dim_ubicacion WHERE alcaldia ILIKE %s AND colonia IS NOT NULL ORDER BY colonia;",
+                    "SELECT DISTINCT colonia FROM dim_ubicacion WHERE unaccent(alcaldia) ILIKE unaccent(%s) AND colonia IS NOT NULL ORDER BY colonia;",
                     (f"%{alcaldia}%",),
                 )
             else:
@@ -437,7 +508,7 @@ def api_ubicaciones_alcaldias(
         where += " AND t.bimestre = %s"
         params.append(bimestre)
     if alcaldia:
-        where += " AND u.alcaldia ILIKE %s"
+        where += " AND unaccent(u.alcaldia) ILIKE unaccent(%s)"
         params.append(f"%{alcaldia}%")
 
     query = f"""
@@ -517,7 +588,7 @@ def api_ubicaciones_colonias(
         where += " AND t.bimestre = %s"
         params.append(bimestre)
     if alcaldia:
-        where += " AND u.alcaldia ILIKE %s"
+        where += " AND unaccent(u.alcaldia) ILIKE unaccent(%s)"
         params.append(f"%{alcaldia}%")
 
     query = f"""
@@ -582,8 +653,8 @@ def api_consumo_alcaldia(
     if bimestre is not None and not 1 <= bimestre <= 6:
         raise HTTPException(status_code=400, detail="bimestre debe estar entre 1 y 6")
 
-    where = " WHERE u.alcaldia ILIKE %s"
-    params: list = [alcaldia.strip()]
+    where = " WHERE unaccent(u.alcaldia) ILIKE unaccent(%s)"
+    params: list = [f"%{alcaldia.strip()}%"]
     if anio is not None:
         where += " AND t.anio = %s"
         params.append(anio)
@@ -710,7 +781,7 @@ def api_alertas(
     params = []
     
     if alcaldia:
-        where += " AND a.alcaldia ILIKE %s"
+        where += " AND unaccent(a.alcaldia) ILIKE unaccent(%s)"
         params.append(f"%{alcaldia}%")
     if anio is not None:
         where += " AND a.anio = %s"
