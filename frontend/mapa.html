@@ -555,6 +555,15 @@
             };
         }
 
+        function estiloPoligonoCritica() {
+            return {
+                color: '#b71c1c',
+                weight: 2.5,
+                fillColor: '#ef5350',
+                fillOpacity: 0.55,
+            };
+        }
+
         function renderAlcaldiasPoligonos(data) {
             if (geoJsonLayer) {
                 map.removeLayer(geoJsonLayer);
@@ -582,6 +591,9 @@
                     const consumo = d ? (d.consumo_total || 0) : null;
                     if (alcaldiaSeleccionada && nombre === alcaldiaSeleccionada) {
                         return estiloPoligonoSel();
+                    }
+                    if (alcaldiasCriticas.size && (alcaldiasCriticas.has(nombre) || alcaldiasCriticas.has(norm(nombre)))) {
+                        return estiloPoligonoCritica();
                     }
                     return estiloPoligonoNormal(consumo, min, max);
                 },
@@ -735,6 +747,7 @@
 
 
         let anomalyMarkers = [];
+        let alcaldiasCriticas = new Set();
 
         async function cargarAnomalias() {
             const showAnomaliesCheckbox = document.getElementById('showAnomalies');
@@ -742,7 +755,9 @@
             if (!showAnomaliesCheckbox.checked) {
                 anomalyMarkers.forEach(m => map.removeLayer(m));
                 anomalyMarkers = [];
+                alcaldiasCriticas = new Set();
                 panel.style.display = 'none';
+                if (geoJsonLayer) geoJsonLayer.resetStyle();
                 return;
             }
 
@@ -759,8 +774,21 @@
                 
                 if (anomalies.length === 0) {
                     listEl.innerHTML = '<li style="justify-content: center; color: #666; padding: 10px;">No se detectaron anomalías</li>';
+                    alcaldiasCriticas = new Set();
+                    if (geoJsonLayer) geoJsonLayer.resetStyle();
                     return;
                 }
+
+                const scorePorAlcaldia = new Map();
+                anomalies.forEach((a) => {
+                    if (!a.alcaldia) return;
+                    const key = norm(a.alcaldia);
+                    scorePorAlcaldia.set(key, (scorePorAlcaldia.get(key) || 0) + (a.score || 0));
+                });
+                const sortedAlcaldias = [...scorePorAlcaldia.entries()].sort((a, b) => b[1] - a[1]);
+                const topN = Math.max(3, Math.ceil(sortedAlcaldias.length / 3));
+                alcaldiasCriticas = new Set(sortedAlcaldias.slice(0, topN).map(([k]) => k));
+                if (geoJsonLayer) geoJsonLayer.resetStyle();
                 
                 anomalies.forEach((anomaly, index) => {
                     if (anomaly.lat && anomaly.lon) {
